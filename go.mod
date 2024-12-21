@@ -1,4 +1,4 @@
-module github.com/haycorns/disfunction
+module github.com/karlhepler/disfunction
 
 go 1.23.3
 
