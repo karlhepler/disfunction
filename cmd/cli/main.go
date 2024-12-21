@@ -11,8 +11,8 @@ import (
 
 func main() {
 	cmd := &cli.Command{
-		Name:  "greet",
-		Usage: "fight the loneliness!",
+		Name:  "random",
+		Usage: "Display a random function and its author from all repositories.",
 		Action: func(context.Context, *cli.Command) error {
 			fmt.Println("Hello friend!")
 			return nil
