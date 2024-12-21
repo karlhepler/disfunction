@@ -8,19 +8,19 @@ import (
 	"github.com/karlhepler/disfunction/internal/function"
 )
 
+type Random struct {
+	GitHub interface {
+		ListOwnerCommitsByDateRange(ctx context.Context, owner string, since, until time.Time, outchan chan<- *github.RepositoryCommit, errchan chan<- error)
+		ListPatchesByCommits(ctx context.Context, commits []*github.RepositoryCommit, outchan chan<- string, errchan chan<- error)
+	}
+}
+
 type RandomReq struct {
 	context.Context
-	Opts struct {
-		Since time.Time
-		Until time.Time
-		Kinds []function.Kind
-	}
-	Deps struct {
-		GitHub interface {
-			ListOwnerCommitsByDateRange(ctx context.Context, owner string, since, until time.Time) ([]*github.Commit, error)
-			ListPatchesByCommits(context.Context, []*github.Commit, chan<- string, chan<- error)
-		}
-	}
+	Owner string
+	Since time.Time
+	Until time.Time
+	Kinds []function.Kind
 }
 
 type RandomRes interface {
@@ -34,18 +34,11 @@ type RandomMsg struct {
 	Patches []string
 }
 
-func Random(req RandomReq, res RandomRes) {
+func (r *Random) Handle(req RandomReq, res RandomRes) {
 	var ctx = req.Context
-	var gh = req.Deps.GitHub
 
-	since, until := req.Opts.Since, req.Opts.Until
-	commits, err := gh.ListCommitsByDateRange(ctx, since, until)
-	if err != nil {
-		res.Log(ErrorLog(err))
-	}
-
-	outchan, errchan := make(chan string), make(chan error)
-	go gh.ListPatchesByCommits(ctx, commits, outchan, errchan)
+	commitChan, errchan := make(chan *github.RepositoryCommit), make(chan error)
+	go r.GitHub.ListOwnerCommitsByDateRange(ctx, req.Owner, req.Since, req.Until, commitChan, errchan)
 	go func() {
 		for err := range errchan {
 			res.Log(ErrorLog(err))
@@ -56,7 +49,24 @@ func Random(req RandomReq, res RandomRes) {
 		}
 	}()
 
-	for patch := range outchan {
+	var commits []*github.RepositoryCommit
+	for commit := range commitChan {
+		commits = append(commits, commit)
+	}
+
+	patchChan, errchan := make(chan string), make(chan error)
+	go r.GitHub.ListPatchesByCommits(ctx, commits, patchChan, errchan)
+	go func() {
+		for err := range errchan {
+			res.Log(ErrorLog(err))
+			res.Send(RandomMsg{
+				Status:  StatusError,
+				Message: "internal error",
+			})
+		}
+	}()
+
+	for patch := range patchChan {
 		res.Send(RandomMsg{Message: patch})
 	}
 }

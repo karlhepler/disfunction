@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-func (c *Client) ListOwnerRepositories(ctx context.Context, owner string, outchan chan<- *github.Repository, errchan chan<- error) {
+func (c *Client) ListOwnerRepos(ctx context.Context, owner string, outchan chan<- *github.Repository, errchan chan<- error) {
 	opt := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
