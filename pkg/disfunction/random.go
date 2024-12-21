@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/function"
-	"github.com/karlhepler/disfunction/internal/github"
 )
 
 type RandomReq struct {
@@ -17,8 +17,8 @@ type RandomReq struct {
 	}
 	Deps struct {
 		GitHub interface {
-			ListCommitsByDateRange(ctx context.Context, since, until time.Time) ([]*github.Commit, error)
-			ListPatchesByCommits(context.Context, []*github.Commit) ([]*github.Patch, error)
+			ListOwnerCommitsByDateRange(ctx context.Context, owner string, since, until time.Time) ([]*github.Commit, error)
+			ListPatchesByCommits(context.Context, []*github.Commit, chan<- string, chan<- error)
 		}
 	}
 }
@@ -31,7 +31,7 @@ type RandomRes interface {
 type RandomMsg struct {
 	Status
 	Message string
-	Patches []*github.Patch
+	Patches []string
 }
 
 func Random(req RandomReq, res RandomRes) {
@@ -44,15 +44,19 @@ func Random(req RandomReq, res RandomRes) {
 		res.Log(ErrorLog(err))
 	}
 
-	patches, err := gh.ListPatchesByCommits(ctx, commits)
-	if err != nil {
-		res.Log(ErrorLog(err))
-		res.Send(RandomMsg{
-			Status:  StatusError,
-			Message: "internal error",
-		})
-		return
-	}
+	outchan, errchan := make(chan string), make(chan error)
+	go gh.ListPatchesByCommits(ctx, commits, outchan, errchan)
+	go func() {
+		for err := range errchan {
+			res.Log(ErrorLog(err))
+			res.Send(RandomMsg{
+				Status:  StatusError,
+				Message: "internal error",
+			})
+		}
+	}()
 
-	res.Send(RandomMsg{Patches: patches})
+	for patch := range outchan {
+		res.Send(RandomMsg{Message: patch})
+	}
 }
