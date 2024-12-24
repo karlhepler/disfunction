@@ -37,9 +37,9 @@ func ListCommitsUntil(until time.Time) listCommitsOption {
 }
 
 func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-chan Commit, <-chan error) {
-	var config *listCommitsConfig
+	var config listCommitsConfig
 	for _, opt := range opts {
-		opt(config)
+		opt(&config)
 	}
 
 	outchan, errchan := make(chan Commit), make(chan error)
@@ -85,9 +85,9 @@ func ListCommitsByRepoUntil(until time.Time) listCommitsByRepoOption {
 }
 
 func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...listCommitsByRepoOption) (<-chan Commit, <-chan error) {
-	var config *listCommitsByRepoConfig
+	var config listCommitsByRepoConfig
 	for _, opt := range opts {
-		opt(config)
+		opt(&config)
 	}
 
 	outchan, errchan := make(chan Commit), make(chan error)

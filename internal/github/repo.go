@@ -20,9 +20,9 @@ func FilterReposByOwner(owner Owner) listReposOption {
 }
 
 func (c *Client) ListRepos(ctx context.Context, opts ...listReposOption) (<-chan *github.Repository, <-chan error) {
-	var config *listReposConfig
+	var config listReposConfig
 	for _, opt := range opts {
-		opt(config)
+		opt(&config)
 	}
 
 	outchan, errchan := make(chan *github.Repository), make(chan error)
