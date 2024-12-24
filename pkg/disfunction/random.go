@@ -4,12 +4,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/karlhepler/disfunction/internal/function"
 	"github.com/karlhepler/disfunction/internal/github"
 )
 
-type Random struct {
+type RandomHandler struct {
 	GitHub *github.Client
+}
+
+func NewRandomHandler(ghtoken string) (*RandomHandler, error) {
+	gh, err := github.NewClient(ghtoken)
+	return &RandomHandler{GitHub: gh}, err
 }
 
 type RandomReq struct {
@@ -17,14 +21,11 @@ type RandomReq struct {
 	Owner string
 	Since time.Time
 	Until time.Time
-	Kinds []function.Kind
 }
 
 type RandomRes interface {
 	Log(string)
 	Send(RandomMsg)
-	SendErr(error)
-	SendErrChan(<-chan error)
 }
 
 type RandomMsg struct {
@@ -33,7 +34,7 @@ type RandomMsg struct {
 	Patches []string
 }
 
-func (r *Random) Handle(req RandomReq, res RandomRes) {
+func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
 	ctx := req.Context
 	owner := github.Owner(req.Owner)
 	date := github.DateRange{
@@ -41,25 +42,31 @@ func (r *Random) Handle(req RandomReq, res RandomRes) {
 		Until: req.Until,
 	}
 
-	commits, errs := r.GitHub.ListOwnerCommitsByDateRange(ctx, owner, date)
-	go r.handleErrs(errs, res)
+	commits, errs := hdl.GitHub.ListOwnerCommitsByDateRange(ctx, owner, date)
+	go hdl.HandleErrs(errs, res)
 
-	patches, errs := r.GitHub.ListPatchesByOwnerRepoCommits(ctx, commits)
-	go r.handleErrs(errs, res)
+	patches, errs := hdl.GitHub.ListPatchesByOwnerRepoCommits(ctx, commits)
+	go hdl.HandleErrs(errs, res)
 
 	for patch := range patches {
 		res.Send(RandomMsg{
 			Message: patch.String(),
 		})
 	}
+
+	return nil
 }
 
-func (r *Random) handleErrs(errs <-chan error, res RandomRes) {
+func (hdl *RandomHandler) HandleErrs(errs <-chan error, res RandomRes) {
 	for err := range errs {
-		res.Log(ErrorLog(err))
-		res.Send(RandomMsg{
-			Status:  StatusError,
-			Message: "internal error",
-		})
+		hdl.HandleErr(err, res)
 	}
+}
+
+func (hdl *RandomHandler) HandleErr(err error, res RandomRes) {
+	res.Log(ErrorLog(err))
+	res.Send(RandomMsg{
+		Status:  StatusError,
+		Message: "internal error",
+	})
 }
