@@ -4,48 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/channel"
 )
-
-type Owner string
-
-func (o Owner) String() string {
-	return string(o)
-}
-
-type Repo string
-
-func (r Repo) String() string {
-	return string(r)
-}
-
-type OwnerRepo struct {
-	Owner
-	Repo
-}
-
-func (or OwnerRepo) String() string {
-	return fmt.Sprintf("%s/%s", or.Owner, or.Repo)
-}
-func (or OwnerRepo) OwnerStr() string {
-	return or.Owner.String()
-}
-func (or OwnerRepo) RepoStr() string {
-	return or.Repo.String()
-}
-
-type OwnerRepoCommit struct {
-	OwnerRepo
-	*github.RepositoryCommit
-}
-type DateRange struct {
-	Since time.Time
-	Until time.Time
-}
-type RepositoryCommit github.RepositoryCommit
 
 func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, date DateRange) (<-chan OwnerRepoCommit, <-chan error) {
 	outchan, errchan := make(chan OwnerRepoCommit), make(chan error)
@@ -60,7 +22,7 @@ func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, d
 			ownrepo := OwnerRepo{Owner: owner, Repo: Repo(*repo.Name)}
 			commits, errs := c.ListOwnerRepoCommitsByDateRange(ctx, ownrepo, date)
 			channel.GoForward(&wg, errs, errchan)
-			channel.Forward(commits, outchan) // FIXME(karlhepler): it's not going past this point
+			channel.Forward(commits, outchan)
 		}
 
 		wg.Wait()
@@ -81,11 +43,14 @@ func (c *Client) ListOwnerRepoCommitsByDateRange(ctx context.Context, ownrepo Ow
 		}
 
 		for {
+			owner, repo := ownrepo.OwnerStr(), ownrepo.RepoStr()
+			c.Debugf("GitHub.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", owner, repo, opt.Page)
 			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, ownrepo.OwnerStr(), ownrepo.RepoStr(), opt)
 			if err != nil {
-				errchan <- fmt.Errorf("error listing owner/repository commits; ownrepo=%s opt=%+v: %w", ownrepo, opt, err)
+				errchan <- fmt.Errorf("error listing owner/repository commits; owner/repo=%s opt=%+v: %w", ownrepo, opt, err)
 			}
 			for _, commit := range commits {
+				c.Debugf("\tsha=%s", *commit.SHA)
 				outchan <- OwnerRepoCommit{ownrepo, commit}
 			}
 			if res == nil || res.NextPage == 0 {

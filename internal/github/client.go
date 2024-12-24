@@ -8,6 +8,7 @@ import (
 
 type Client struct {
 	GitHub *github.Client
+	Debugf func(string, ...any)
 }
 
 func NewClient(ghtoken string) (*Client, error) {
@@ -18,6 +19,7 @@ func NewClient(ghtoken string) (*Client, error) {
 
 	client := &Client{
 		GitHub: gh,
+		Debugf: func(format string, a ...any) {},
 	}
 
 	return client, nil

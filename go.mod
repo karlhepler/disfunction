@@ -9,4 +9,7 @@ require (
 	github.com/urfave/cli/v3 v3.0.0-alpha9.2
 )
 
-require github.com/google/go-querystring v1.1.0 // indirect
+require (
+	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/lithammer/dedent v1.1.0 // indirect
+)

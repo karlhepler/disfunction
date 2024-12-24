@@ -2,6 +2,8 @@ package disfunction
 
 import (
 	"context"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/karlhepler/disfunction/internal/github"
@@ -13,6 +15,16 @@ type RandomHandler struct {
 
 func NewRandomHandler(ghtoken string) (*RandomHandler, error) {
 	gh, err := github.NewClient(ghtoken)
+
+	// TODO(karlhepler): this should somehow be defined in an outer layer
+	gh.Debugf = func(format string, a ...any) {
+		format = "[DEBUG] " + format
+		if !strings.HasSuffix(format, "\n") {
+			format += "\n"
+		}
+		log.Printf(format, a...)
+	}
+
 	return &RandomHandler{GitHub: gh}, err
 }
 

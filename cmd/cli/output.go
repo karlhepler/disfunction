@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/karlhepler/disfunction/pkg/disfunction"
 )
@@ -18,7 +17,7 @@ func (out Output) Log(a string) {
 
 func (out Output) Send(res disfunction.RandomMsg) {
 	if res.Status == disfunction.StatusError {
-		fmt.Fprintln(os.Stderr, "[ERROR] "+res.Message)
+		log.Println("[ERROR] " + res.Message)
 		return
 	}
 

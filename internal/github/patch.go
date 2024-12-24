@@ -7,19 +7,6 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-type OwnerRepoCommitPatch struct {
-	OwnerRepoCommit
-	Patch string
-}
-
-func (orcp OwnerRepoCommitPatch) String() string {
-	return fmt.Sprintf(`
-		OwnerRepo: %s
-		Commit SHA: %s
-		Patch: %s
-	`, orcp.OwnerRepo, *orcp.SHA, orcp.Patch)
-}
-
 func (c *Client) ListPatchesByOwnerRepoCommits(ctx context.Context, commits <-chan OwnerRepoCommit) (<-chan OwnerRepoCommitPatch, <-chan error) {
 	outchan, errchan := make(chan OwnerRepoCommitPatch), make(chan error)
 	go func() {
@@ -29,12 +16,15 @@ func (c *Client) ListPatchesByOwnerRepoCommits(ctx context.Context, commits <-ch
 		opt := &github.ListOptions{PerPage: 100}
 
 		for commit := range commits {
-			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, commit.Owner.String(), commit.Repo.String(), *commit.SHA, opt)
+			owner, repo := commit.Owner.String(), commit.Repo.String()
+			c.Debugf("GitHub.Repositories.GetCommit(owner=%s, repo=%s, sha=%s, page=%d)", owner, repo, *commit.SHA, opt.Page)
+			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, owner, repo, *commit.SHA, opt)
 			if err != nil {
-				errchan <- fmt.Errorf("error getting repository commit; ownrepo=%s sha=%s", commit.OwnerRepo, *commit.SHA)
+				errchan <- fmt.Errorf("error getting repository commit; owner/repo=%s sha=%s", commit.OwnerRepo, *commit.SHA)
 			}
 
 			for _, file := range meta.Files {
+				c.Debugf("\tfile=%s", *file.Filename)
 				outchan <- OwnerRepoCommitPatch{commit, *file.Patch}
 			}
 

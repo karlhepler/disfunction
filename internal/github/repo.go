@@ -18,11 +18,13 @@ func (c *Client) ListReposByOwner(ctx context.Context, owner Owner) (<-chan *git
 		}
 
 		for {
+			c.Debugf("GitHub.Repositories.ListByOrg(owner=%s, page=%d)", owner.String(), opt.Page)
 			repos, res, err := c.GitHub.Repositories.ListByOrg(ctx, owner.String(), opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing repos by owner, owner=%s opt%+v", owner, opt)
 			}
 			for _, repo := range repos {
+				c.Debugf("\trepo=%s", *repo.FullName)
 				outchan <- repo
 			}
 			if res == nil || res.NextPage == 0 {
