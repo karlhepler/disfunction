@@ -77,7 +77,8 @@ func main() {
 						Until:   cmd.Timestamp("until"),
 					}
 
-					return hdl.Handle(req, output)
+					hdl.Handle(req, output)
+					return nil
 				},
 			},
 		},

@@ -49,15 +49,8 @@ func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-
 		var wg sync.WaitGroup
 
 		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner))
-		wg.Add(1)
-		go func(errs <-chan error) {
-			defer wg.Done()
-			for err := range errs {
-				errchan <- err
-			}
-		}(errs)
-
-		for repo := range repos {
+		channel.GoForward(&wg, errs, errchan)
+		channel.ForEach(repos, func(repo *github.Repository) {
 			commits, errs := c.ListCommitsByRepo(ctx,
 				Repo{
 					Owner: Owner(*repo.Owner.Login),
@@ -66,17 +59,9 @@ func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-
 				ListCommitsByRepoSince(config.since),
 				ListCommitsByRepoUntil(config.until),
 			)
-
-			wg.Add(1)
-			go func(errs <-chan error) {
-				defer wg.Done()
-				for err := range errs {
-					errchan <- err
-				}
-			}(errs)
-
+			channel.GoForward(&wg, errs, errchan)
 			channel.Forward(commits, outchan)
-		}
+		})
 
 		wg.Wait()
 	}()

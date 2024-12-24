@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/karlhepler/disfunction/internal/channel"
 	"github.com/karlhepler/disfunction/internal/github"
 	"github.com/karlhepler/disfunction/internal/log"
 )
@@ -34,46 +35,27 @@ type RandomMsg struct {
 	Patch github.Patch
 }
 
-func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
+func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 	ctx := req.Context
 	owner := github.Owner(req.Owner)
 	var wg sync.WaitGroup
 
+	// get commits
 	commits, errs := hdl.GitHub.ListCommits(ctx,
 		github.FilterCommitsByOwner(owner),
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
 	)
-	wg.Add(1)
-	go func(errs <-chan error) {
-		defer wg.Done()
-		for err := range errs {
-			hdl.HandleErr(err)
-		}
-	}(errs)
+	channel.GoForEach(&wg, errs, hdl.HandleErr)
 
+	// get all patches from commits
 	patches, errs := hdl.GitHub.ListPatchesByCommits(ctx, commits)
-	wg.Add(1)
-	go func(errs <-chan error) {
-		defer wg.Done()
-		for err := range errs {
-			hdl.HandleErr(err)
-		}
-	}(errs)
-
-	for patch := range patches {
+	channel.GoForEach(&wg, errs, hdl.HandleErr)
+	channel.ForEach(patches, func(patch github.Patch) {
 		res.Send(RandomMsg{Patch: patch})
-	}
+	})
 
 	wg.Wait()
-
-	return nil
-}
-
-func (hdl *RandomHandler) HandleErrs(errs <-chan error, res RandomRes) {
-	for err := range errs {
-		hdl.HandleErr(err)
-	}
 }
 
 func (hdl *RandomHandler) HandleErr(err error) {

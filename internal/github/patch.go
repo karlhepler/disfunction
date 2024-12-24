@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"fmt"
+
+	"github.com/karlhepler/disfunction/internal/channel"
 )
 
 func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit) (<-chan Patch, <-chan error) {
@@ -11,7 +13,7 @@ func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit
 		defer close(outchan)
 		defer close(errchan)
 
-		for commit := range commits {
+		channel.ForEach(commits, func(commit Commit) {
 			c.Log.Debugf("GitHub.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
 			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, nil)
 			if err != nil {
@@ -26,9 +28,9 @@ func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit
 			}
 
 			if res == nil {
-				break
+				return
 			}
-		}
+		})
 	}()
 	return outchan, errchan
 }
