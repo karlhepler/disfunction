@@ -22,7 +22,7 @@ func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, d
 			ownrepo := OwnerRepo{Owner: owner, Repo: Repo(*repo.Name)}
 			commits, errs := c.ListOwnerRepoCommitsByDateRange(ctx, ownrepo, date)
 			channel.GoForward(&wg, errs, errchan)
-			channel.Forward(commits, outchan)
+			channel.GoForward(&wg, commits, outchan)
 		}
 
 		wg.Wait()
