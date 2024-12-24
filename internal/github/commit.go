@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v67/github"
@@ -51,15 +52,18 @@ func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, d
 	go func() {
 		defer close(outchan)
 		defer close(errchan)
+		var wg sync.WaitGroup
 
 		repos, errs := c.ListReposByOwner(ctx, owner)
-		go channel.Forward(errs, errchan) // TODO(karlhepler): Make a Forward wrapping function that lets me set a Sprintf string to wrap over the error
+		channel.GoForward(&wg, errs, errchan) // TODO(karlhepler): Make a Forward wrapping function that lets me set a Sprintf string to wrap over the error
 		for repo := range repos {
 			ownrepo := OwnerRepo{Owner: owner, Repo: Repo(*repo.Name)}
 			commits, errs := c.ListOwnerRepoCommitsByDateRange(ctx, ownrepo, date)
-			go channel.Forward(errs, errchan)
+			channel.GoForward(&wg, errs, errchan)
 			channel.Forward(commits, outchan) // FIXME(karlhepler): it's not going past this point
 		}
+
+		wg.Wait()
 	}()
 	return outchan, errchan
 }

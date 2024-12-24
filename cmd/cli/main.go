@@ -27,25 +27,34 @@ chosen from all repositories within a date range.`,
 						Required: true,
 					},
 					&cli.TimestampFlag{
-						Name: "since",
-						Usage: `Only commits after this date will be returned.
-	This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-	`,
+						Name:  "since",
+						Usage: "Only commits after this date will be returned.",
+						Config: cli.TimestampConfig{
+							Layouts: []string{
+								time.DateOnly, // 2006-01-02
+								time.DateTime, // 2006-01-02 15:04:05
+								time.Kitchen,  // 3:04PM
+								time.RFC3339,  // 2006-01-02T15:04:05Z07:00
+								time.TimeOnly, // 15:04:05
+							},
+						},
 						Value:       time.StartOfDay(time.Now()),
 						DefaultText: "beginning of today",
 					},
 					&cli.TimestampFlag{
-						Name: "until",
-						Usage: `Only commits before this date will be returned.
-	This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-	`,
+						Name:  "until",
+						Usage: "Only commits before this date will be returned.",
+						Config: cli.TimestampConfig{
+							Layouts: []string{
+								time.DateOnly, // 2006-01-02
+								time.DateTime, // 2006-01-02 15:04:05
+								time.Kitchen,  // 3:04PM
+								time.RFC3339,  // 2006-01-02T15:04:05Z07:00
+								time.TimeOnly, // 15:04:05
+							},
+						},
 						Value:       time.Now(),
 						DefaultText: "now",
-					},
-					&cli.StringSliceFlag{
-						Name: "kind",
-						Usage: `Filter kinds of functions by this list.
-	supported kinds: new`,
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
