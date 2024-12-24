@@ -40,7 +40,7 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 	owner := github.Owner(req.Owner)
 	var wg sync.WaitGroup
 
-	// get commits
+	// list all commits
 	commits, errs := hdl.GitHub.ListCommits(ctx,
 		github.FilterCommitsByOwner(owner),
 		github.ListCommitsSince(req.Since),
@@ -48,12 +48,14 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 	)
 	channel.GoForEach(&wg, errs, hdl.HandleErr)
 
-	// get all patches from commits
+	// list all patches from commits
 	patches, errs := hdl.GitHub.ListPatchesByCommits(ctx, commits)
 	channel.GoForEach(&wg, errs, hdl.HandleErr)
 	channel.ForEach(patches, func(patch github.Patch) {
 		res.Send(RandomMsg{Patch: patch})
 	})
+
+	// list all new function declarations for all patches
 
 	wg.Wait()
 }
