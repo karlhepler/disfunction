@@ -7,8 +7,8 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-func (c *Client) ListPatchesByOrgRepoCommits(ctx context.Context, commits <-chan OrgRepoCommit) (<-chan OrgRepoCommitPatch, <-chan error) {
-	outchan, errchan := make(chan OrgRepoCommitPatch), make(chan error)
+func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit) (<-chan Patch, <-chan error) {
+	outchan, errchan := make(chan Patch), make(chan error)
 	go func() {
 		defer close(outchan)
 		defer close(errchan)
@@ -16,16 +16,15 @@ func (c *Client) ListPatchesByOrgRepoCommits(ctx context.Context, commits <-chan
 		opt := &github.ListOptions{PerPage: 100}
 
 		for commit := range commits {
-			org, repo := commit.Org.String(), commit.Repo.String()
-			c.Log.Debugf("GitHub.Repositories.GetCommit(org=%s, repo=%s, sha=%s, page=%d)", org, repo, *commit.SHA, opt.Page)
-			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, org, repo, *commit.SHA, opt)
+			c.Log.Debugf("GitHub.Repositories.GetCommit(owner=%s, repo=%s, sha=%s, page=%d)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA, opt.Page)
+			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, opt)
 			if err != nil {
-				errchan <- fmt.Errorf("error getting org/repo commit; org/repo=%s sha=%s", commit.OrgRepo, *commit.SHA)
+				errchan <- fmt.Errorf("error getting commit; repo=%s sha=%s", commit.Repo, *commit.SHA)
 			}
 
 			for _, file := range meta.Files {
 				c.Log.Debugf("\tfile=%s", *file.Filename)
-				outchan <- OrgRepoCommitPatch{commit, *file.Patch}
+				outchan <- Patch{commit, *file.Patch}
 			}
 
 			if res == nil || res.NextPage == 0 {

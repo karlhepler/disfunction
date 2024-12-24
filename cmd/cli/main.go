@@ -17,14 +17,12 @@ func main() {
 		Usage: "What dis function?",
 		Commands: []*cli.Command{
 			{
-				Name: "random",
-				Usage: `Display a random function
-chosen from all repositories within a date range.`,
+				Name:  "random",
+				Usage: "Display a random function chosen from all affiliated repositories within a date range.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "org",
-						Usage:    "The GitHub organization.",
-						Required: true,
+						Name:  "owner",
+						Usage: "Filter repositories by owner.",
 					},
 					&cli.TimestampFlag{
 						Name:  "since",
@@ -74,7 +72,7 @@ chosen from all repositories within a date range.`,
 
 					req := disfunction.RandomReq{
 						Context: ctx,
-						Org:     cmd.String("org"),
+						Owner:   cmd.String("owner"),
 						Since:   cmd.Timestamp("since"),
 						Until:   cmd.Timestamp("until"),
 					}

@@ -8,29 +8,23 @@ import (
 	"github.com/lithammer/dedent"
 )
 
-type Org string
+type Owner string
 
-func (o Org) String() string {
+func (o Owner) String() string {
 	return string(o)
 }
 
-type Repo string
+type Repo struct {
+	Owner
+	Name string
+}
 
 func (r Repo) String() string {
-	return string(r)
+	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
-type OrgRepo struct {
-	Org
+type Commit struct {
 	Repo
-}
-
-func (or OrgRepo) String() string {
-	return fmt.Sprintf("%s/%s", or.Org, or.Repo)
-}
-
-type OrgRepoCommit struct {
-	OrgRepo
 	*github.RepositoryCommit
 }
 
@@ -39,20 +33,18 @@ type DateRange struct {
 	Until time.Time
 }
 
-type RepositoryCommit github.RepositoryCommit
-
-type OrgRepoCommitPatch struct {
-	OrgRepoCommit
+type Patch struct {
+	Commit
 	Patch string
 }
 
-func (orcp OrgRepoCommitPatch) String() string {
+func (patch Patch) String() string {
 	return fmt.Sprintf(dedent.Dedent(`
 		---
-		Org/Repo: %s
+		Repo: %s
 		Author: %s
 		Commit SHA: %s
 		---
 		%s
-	`), orcp.OrgRepo, *orcp.Author.Login, *orcp.SHA, orcp.Patch)
+	`), patch.Repo, *patch.Author.Login, *patch.SHA, patch.Patch)
 }

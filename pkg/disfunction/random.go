@@ -20,7 +20,7 @@ func NewRandomHandler(ghtoken string, log log.Logger) (*RandomHandler, error) {
 
 type RandomReq struct {
 	context.Context
-	Org   string
+	Owner string
 	Since time.Time
 	Until time.Time
 }
@@ -30,21 +30,21 @@ type RandomRes interface {
 }
 
 type RandomMsg struct {
-	Patch github.OrgRepoCommitPatch
+	Patch github.Patch
 }
 
 func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
 	ctx := req.Context
-	org := github.Org(req.Org)
-	date := github.DateRange{
-		Since: req.Since,
-		Until: req.Until,
-	}
+	owner := github.Owner(req.Owner)
 
-	commits, errs := hdl.GitHub.ListOrgCommitsByDateRange(ctx, org, date)
+	commits, errs := hdl.GitHub.ListCommits(ctx,
+		github.FilterCommitsByOwner(owner),
+		github.ListCommitsSince(req.Since),
+		github.ListCommitsUntil(req.Until),
+	)
 	go hdl.HandleErrs(errs, res)
 
-	patches, errs := hdl.GitHub.ListPatchesByOrgRepoCommits(ctx, commits)
+	patches, errs := hdl.GitHub.ListPatchesByCommits(ctx, commits)
 	go hdl.HandleErrs(errs, res)
 
 	for patch := range patches {
