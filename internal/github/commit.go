@@ -60,7 +60,7 @@ func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-
 				ListCommitsByRepoUntil(config.until),
 			)
 			channel.GoForward(&wg, errs, errchan)
-			channel.Forward(commits, outchan)
+			channel.GoForward(&wg, commits, outchan)
 		})
 
 		wg.Wait()
