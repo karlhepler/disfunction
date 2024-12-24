@@ -7,25 +7,42 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-func (c *Client) ListPatchesByCommits(ctx context.Context, commits []*github.RepositoryCommit, outchan chan<- string, errchan chan<- error) {
-	defer close(outchan)
-	defer close(errchan)
+type OwnerRepoCommitPatch struct {
+	OwnerRepoCommit
+	Patch string
+}
 
-	opt := &github.ListOptions{PerPage: 100}
-	for _, commit := range commits {
-		// TODO(karlhepler): replace hardcoded owner and repo with variables
-		commit, res, err := c.GitHub.Repositories.GetCommit(ctx, "karlhepler", "disfunction", *commit.SHA, opt)
-		if err != nil {
-			errchan <- fmt.Errorf("error getting repository commit for owner=karlhepler repo=disfunction sha=" + *commit.SHA)
-		}
-		if res == nil || res.NextPage == 0 {
-			break
-		}
-		opt.Page = res.NextPage
+func (orcp OwnerRepoCommitPatch) String() string {
+	return fmt.Sprintf(`
+		OwnerRepo: %s
+		Commit SHA: %s
+		Patch: %s
+	`, orcp.OwnerRepo, *orcp.SHA, orcp.Patch)
+}
 
-		// add the commit patches to the patches
-		for _, file := range commit.Files {
-			outchan <- *file.Patch
+func (c *Client) ListPatchesByOwnerRepoCommits(ctx context.Context, commits <-chan OwnerRepoCommit) (<-chan OwnerRepoCommitPatch, <-chan error) {
+	outchan, errchan := make(chan OwnerRepoCommitPatch), make(chan error)
+	go func() {
+		defer close(outchan)
+		defer close(errchan)
+
+		opt := &github.ListOptions{PerPage: 100}
+
+		for commit := range commits {
+			meta, res, err := c.GitHub.Repositories.GetCommit(ctx, commit.Owner.String(), commit.Repo.String(), *commit.SHA, opt)
+			if err != nil {
+				errchan <- fmt.Errorf("error getting repository commit; ownrepo=%s sha=%s", commit.OwnerRepo, *commit.SHA)
+			}
+
+			for _, file := range meta.Files {
+				outchan <- OwnerRepoCommitPatch{commit, *file.Patch}
+			}
+
+			if res == nil || res.NextPage == 0 {
+				break
+			}
+			opt.Page = res.NextPage
 		}
-	}
+	}()
+	return outchan, errchan
 }

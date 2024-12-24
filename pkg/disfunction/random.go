@@ -4,15 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/function"
+	"github.com/karlhepler/disfunction/internal/github"
 )
 
 type Random struct {
-	GitHub interface {
-		ListOwnerCommitsByDateRange(ctx context.Context, owner string, since, until time.Time, outchan chan<- *github.RepositoryCommit, errchan chan<- error)
-		ListPatchesByCommits(ctx context.Context, commits []*github.RepositoryCommit, outchan chan<- string, errchan chan<- error)
-	}
+	GitHub *github.Client
 }
 
 type RandomReq struct {
@@ -26,6 +23,8 @@ type RandomReq struct {
 type RandomRes interface {
 	Log(string)
 	Send(RandomMsg)
+	SendErr(error)
+	SendErrChan(<-chan error)
 }
 
 type RandomMsg struct {
@@ -35,38 +34,32 @@ type RandomMsg struct {
 }
 
 func (r *Random) Handle(req RandomReq, res RandomRes) {
-	var ctx = req.Context
-
-	commitChan, errchan := make(chan *github.RepositoryCommit), make(chan error)
-	go r.GitHub.ListOwnerCommitsByDateRange(ctx, req.Owner, req.Since, req.Until, commitChan, errchan)
-	go func() {
-		for err := range errchan {
-			res.Log(ErrorLog(err))
-			res.Send(RandomMsg{
-				Status:  StatusError,
-				Message: "internal error",
-			})
-		}
-	}()
-
-	var commits []*github.RepositoryCommit
-	for commit := range commitChan {
-		commits = append(commits, commit)
+	ctx := req.Context
+	owner := github.Owner(req.Owner)
+	date := github.DateRange{
+		Since: req.Since,
+		Until: req.Until,
 	}
 
-	patchChan, errchan := make(chan string), make(chan error)
-	go r.GitHub.ListPatchesByCommits(ctx, commits, patchChan, errchan)
-	go func() {
-		for err := range errchan {
-			res.Log(ErrorLog(err))
-			res.Send(RandomMsg{
-				Status:  StatusError,
-				Message: "internal error",
-			})
-		}
-	}()
+	commits, errs := r.GitHub.ListOwnerCommitsByDateRange(ctx, owner, date)
+	go r.handleErrs(errs, res)
 
-	for patch := range patchChan {
-		res.Send(RandomMsg{Message: patch})
+	patches, errs := r.GitHub.ListPatchesByOwnerRepoCommits(ctx, commits)
+	go r.handleErrs(errs, res)
+
+	for patch := range patches {
+		res.Send(RandomMsg{
+			Message: patch.String(),
+		})
+	}
+}
+
+func (r *Random) handleErrs(errs <-chan error, res RandomRes) {
+	for err := range errs {
+		res.Log(ErrorLog(err))
+		res.Send(RandomMsg{
+			Status:  StatusError,
+			Message: "internal error",
+		})
 	}
 }

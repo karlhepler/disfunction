@@ -7,26 +7,29 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-func (c *Client) ListOwnerRepos(ctx context.Context, owner string, outchan chan<- *github.Repository, errchan chan<- error) {
-	opt := &github.RepositoryListByOrgOptions{
-		ListOptions: github.ListOptions{PerPage: 100},
-	}
+func (c *Client) ListOwnerRepos(ctx context.Context, owner Owner) (<-chan *github.Repository, <-chan error) {
+	outchan, errchan := make(chan *github.Repository), make(chan error)
+	go func() {
+		defer close(outchan)
+		defer close(errchan)
 
-	for {
-		repos, res, err := c.GitHub.Repositories.ListByOrg(ctx, owner, opt)
-		if err != nil {
-			errchan <- fmt.Errorf("error listing repos by org, org=%s opt%+v", owner, opt)
+		opt := &github.RepositoryListByOrgOptions{
+			ListOptions: github.ListOptions{PerPage: 100},
 		}
 
-		if repos != nil {
+		for {
+			repos, res, err := c.GitHub.Repositories.ListByOrg(ctx, owner.String(), opt)
+			if err != nil {
+				errchan <- fmt.Errorf("error listing repos by owner, owner=%s opt%+v", owner, opt)
+			}
 			for _, repo := range repos {
 				outchan <- repo
 			}
+			if res == nil || res.NextPage == 0 {
+				break
+			}
+			opt.Page = res.NextPage
 		}
-
-		if res == nil || res.NextPage == 0 {
-			break
-		}
-		opt.Page = res.NextPage
-	}
+	}()
+	return outchan, errchan
 }
