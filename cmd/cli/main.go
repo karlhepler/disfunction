@@ -56,9 +56,14 @@ chosen from all repositories within a date range.`,
 						Value:       time.Now(),
 						DefaultText: "now",
 					},
+					&cli.BoolFlag{
+						Name:  "debug",
+						Usage: "Output debug logging.",
+					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					var output Output
+					output.EnableDebug = cmd.Bool("debug")
 
 					token := must.Env("GITHUB_TOKEN")
 					hdl, err := disfunction.NewRandomHandler(token, output)

@@ -9,10 +9,14 @@ import (
 )
 
 type Output struct {
-	//
+	EnableDebug bool
 }
 
 func (out Output) Debugf(format string, a ...any) {
+	if !out.EnableDebug {
+		return
+	}
+
 	format = "[DEBUG] " + format
 	if !strings.HasSuffix(format, "\n") {
 		format += "\n"
