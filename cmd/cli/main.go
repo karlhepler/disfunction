@@ -68,7 +68,7 @@ chosen from all repositories within a date range.`,
 					token := must.Env("GITHUB_TOKEN")
 					hdl, err := disfunction.NewRandomHandler(token, output)
 					if err != nil {
-						hdl.HandleErr(err, output)
+						hdl.HandleErr(err)
 						os.Exit(1)
 					}
 

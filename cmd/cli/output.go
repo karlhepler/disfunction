@@ -29,5 +29,5 @@ func (out Output) Error(err error) {
 }
 
 func (out Output) Send(res disfunction.RandomMsg) {
-	fmt.Println(res.Message)
+	fmt.Println(res.Patch)
 }

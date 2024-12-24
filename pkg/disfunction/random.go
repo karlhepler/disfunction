@@ -30,7 +30,7 @@ type RandomRes interface {
 }
 
 type RandomMsg struct {
-	Message string
+	Patch github.OrgRepoCommitPatch
 }
 
 func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
@@ -48,9 +48,7 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
 	go hdl.HandleErrs(errs, res)
 
 	for patch := range patches {
-		res.Send(RandomMsg{
-			Message: patch.String(),
-		})
+		res.Send(RandomMsg{Patch: patch})
 	}
 
 	return nil
@@ -58,13 +56,10 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
 
 func (hdl *RandomHandler) HandleErrs(errs <-chan error, res RandomRes) {
 	for err := range errs {
-		hdl.HandleErr(err, res)
+		hdl.HandleErr(err)
 	}
 }
 
-func (hdl *RandomHandler) HandleErr(err error, res RandomRes) {
+func (hdl *RandomHandler) HandleErr(err error) {
 	hdl.Log.Error(err)
-	res.Send(RandomMsg{
-		Message: "internal error",
-	})
 }
