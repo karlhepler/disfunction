@@ -8,9 +8,9 @@ import (
 	"github.com/lithammer/dedent"
 )
 
-type Owner string
+type Org string
 
-func (o Owner) String() string {
+func (o Org) String() string {
 	return string(o)
 }
 
@@ -20,25 +20,25 @@ func (r Repo) String() string {
 	return string(r)
 }
 
-type OwnerRepo struct {
-	Owner
+type OrgRepo struct {
+	Org
 	Repo
 }
 
-func (or OwnerRepo) String() string {
-	return fmt.Sprintf("%s/%s", or.Owner, or.Repo)
+func (or OrgRepo) String() string {
+	return fmt.Sprintf("%s/%s", or.Org, or.Repo)
 }
 
-func (or OwnerRepo) OwnerStr() string {
-	return or.Owner.String()
+func (or OrgRepo) OrgStr() string {
+	return or.Org.String()
 }
 
-func (or OwnerRepo) RepoStr() string {
+func (or OrgRepo) RepoStr() string {
 	return or.Repo.String()
 }
 
-type OwnerRepoCommit struct {
-	OwnerRepo
+type OrgRepoCommit struct {
+	OrgRepo
 	*github.RepositoryCommit
 }
 
@@ -49,18 +49,18 @@ type DateRange struct {
 
 type RepositoryCommit github.RepositoryCommit
 
-type OwnerRepoCommitPatch struct {
-	OwnerRepoCommit
+type OrgRepoCommitPatch struct {
+	OrgRepoCommit
 	Patch string
 }
 
-func (orcp OwnerRepoCommitPatch) String() string {
+func (orcp OrgRepoCommitPatch) String() string {
 	return fmt.Sprintf(dedent.Dedent(`
 		---
-		Owner/Repo: %s
+		Org/Repo: %s
 		Author: %s
 		Commit SHA: %s
 		---
 		%s
-	`), orcp.OwnerRepo, *orcp.Author.Login, *orcp.SHA, orcp.Patch)
+	`), orcp.OrgRepo, *orcp.Author.Login, *orcp.SHA, orcp.Patch)
 }

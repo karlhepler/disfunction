@@ -22,8 +22,8 @@ func main() {
 chosen from all repositories within a date range.`,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "owner",
-						Usage:    "The owner of the repositories.",
+						Name:     "org",
+						Usage:    "The GitHub organization.",
 						Required: true,
 					},
 					&cli.TimestampFlag{
@@ -69,7 +69,7 @@ chosen from all repositories within a date range.`,
 
 					req := disfunction.RandomReq{
 						Context: ctx,
-						Owner:   cmd.String("owner"),
+						Org:     cmd.String("org"),
 						Since:   cmd.Timestamp("since"),
 						Until:   cmd.Timestamp("until"),
 					}

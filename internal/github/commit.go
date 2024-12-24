@@ -9,18 +9,18 @@ import (
 	"github.com/karlhepler/disfunction/internal/channel"
 )
 
-func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, date DateRange) (<-chan OwnerRepoCommit, <-chan error) {
-	outchan, errchan := make(chan OwnerRepoCommit), make(chan error)
+func (c *Client) ListOrgCommitsByDateRange(ctx context.Context, org Org, date DateRange) (<-chan OrgRepoCommit, <-chan error) {
+	outchan, errchan := make(chan OrgRepoCommit), make(chan error)
 	go func() {
 		defer close(outchan)
 		defer close(errchan)
 		var wg sync.WaitGroup
 
-		repos, errs := c.ListReposByOwner(ctx, owner)
+		repos, errs := c.ListReposByOrg(ctx, org)
 		channel.GoForward(&wg, errs, errchan) // TODO(karlhepler): Make a Forward wrapping function that lets me set a Sprintf string to wrap over the error
 		for repo := range repos {
-			ownrepo := OwnerRepo{Owner: owner, Repo: Repo(*repo.Name)}
-			commits, errs := c.ListOwnerRepoCommitsByDateRange(ctx, ownrepo, date)
+			ownrepo := OrgRepo{Org: org, Repo: Repo(*repo.Name)}
+			commits, errs := c.ListOrgRepoCommitsByDateRange(ctx, ownrepo, date)
 			channel.GoForward(&wg, errs, errchan)
 			channel.GoForward(&wg, commits, outchan)
 		}
@@ -30,8 +30,8 @@ func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, d
 	return outchan, errchan
 }
 
-func (c *Client) ListOwnerRepoCommitsByDateRange(ctx context.Context, ownrepo OwnerRepo, date DateRange) (<-chan OwnerRepoCommit, <-chan error) {
-	outchan, errchan := make(chan OwnerRepoCommit), make(chan error)
+func (c *Client) ListOrgRepoCommitsByDateRange(ctx context.Context, ownrepo OrgRepo, date DateRange) (<-chan OrgRepoCommit, <-chan error) {
+	outchan, errchan := make(chan OrgRepoCommit), make(chan error)
 	go func() {
 		defer close(outchan)
 		defer close(errchan)
@@ -43,15 +43,15 @@ func (c *Client) ListOwnerRepoCommitsByDateRange(ctx context.Context, ownrepo Ow
 		}
 
 		for {
-			owner, repo := ownrepo.OwnerStr(), ownrepo.RepoStr()
-			c.Debugf("GitHub.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", owner, repo, opt.Page)
-			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, owner, repo, opt)
+			org, repo := ownrepo.OrgStr(), ownrepo.RepoStr()
+			c.Debugf("GitHub.Repositories.ListCommits(org=%s, repo=%s, page=%d)", org, repo, opt.Page)
+			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, org, repo, opt)
 			if err != nil {
-				errchan <- fmt.Errorf("error listing owner/repository commits; owner/repo=%s opt=%+v: %w", ownrepo, opt, err)
+				errchan <- fmt.Errorf("error listing org/repo commits; org/repo=%s opt=%+v: %w", ownrepo, opt, err)
 			}
 			for _, commit := range commits {
 				c.Debugf("\tsha=%s", *commit.SHA)
-				outchan <- OwnerRepoCommit{ownrepo, commit}
+				outchan <- OrgRepoCommit{ownrepo, commit}
 			}
 			if res == nil || res.NextPage == 0 {
 				break
