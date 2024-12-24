@@ -29,14 +29,6 @@ func (or OrgRepo) String() string {
 	return fmt.Sprintf("%s/%s", or.Org, or.Repo)
 }
 
-func (or OrgRepo) OrgStr() string {
-	return or.Org.String()
-}
-
-func (or OrgRepo) RepoStr() string {
-	return or.Repo.String()
-}
-
 type OrgRepoCommit struct {
 	OrgRepo
 	*github.RepositoryCommit

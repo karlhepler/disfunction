@@ -43,7 +43,7 @@ func (c *Client) ListOrgRepoCommitsByDateRange(ctx context.Context, ownrepo OrgR
 		}
 
 		for {
-			org, repo := ownrepo.OrgStr(), ownrepo.RepoStr()
+			org, repo := ownrepo.Org.String(), ownrepo.Repo.String()
 			c.Debugf("GitHub.Repositories.ListCommits(org=%s, repo=%s, page=%d)", org, repo, opt.Page)
 			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, org, repo, opt)
 			if err != nil {
