@@ -2,30 +2,20 @@ package disfunction
 
 import (
 	"context"
-	"log"
-	"strings"
 	"time"
 
 	"github.com/karlhepler/disfunction/internal/github"
+	"github.com/karlhepler/disfunction/internal/log"
 )
 
 type RandomHandler struct {
 	GitHub *github.Client
+	Log    log.Logger
 }
 
-func NewRandomHandler(ghtoken string) (*RandomHandler, error) {
-	gh, err := github.NewClient(ghtoken)
-
-	// TODO(karlhepler): this should somehow be defined in an outer layer
-	gh.Debugf = func(format string, a ...any) {
-		format = "[DEBUG] " + format
-		if !strings.HasSuffix(format, "\n") {
-			format += "\n"
-		}
-		log.Printf(format, a...)
-	}
-
-	return &RandomHandler{GitHub: gh}, err
+func NewRandomHandler(ghtoken string, log log.Logger) (*RandomHandler, error) {
+	gh, err := github.NewClient(ghtoken, log)
+	return &RandomHandler{GitHub: gh, Log: log}, err
 }
 
 type RandomReq struct {
@@ -36,14 +26,11 @@ type RandomReq struct {
 }
 
 type RandomRes interface {
-	Log(string)
 	Send(RandomMsg)
 }
 
 type RandomMsg struct {
-	Status
 	Message string
-	Patches []string
 }
 
 func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
@@ -76,9 +63,8 @@ func (hdl *RandomHandler) HandleErrs(errs <-chan error, res RandomRes) {
 }
 
 func (hdl *RandomHandler) HandleErr(err error, res RandomRes) {
-	res.Log(ErrorLog(err))
+	hdl.Log.Error(err)
 	res.Send(RandomMsg{
-		Status:  StatusError,
 		Message: "internal error",
 	})
 }

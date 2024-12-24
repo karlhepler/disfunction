@@ -44,13 +44,13 @@ func (c *Client) ListOrgRepoCommitsByDateRange(ctx context.Context, ownrepo OrgR
 
 		for {
 			org, repo := ownrepo.Org.String(), ownrepo.Repo.String()
-			c.Debugf("GitHub.Repositories.ListCommits(org=%s, repo=%s, page=%d)", org, repo, opt.Page)
+			c.Log.Debugf("GitHub.Repositories.ListCommits(org=%s, repo=%s, page=%d)", org, repo, opt.Page)
 			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, org, repo, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing org/repo commits; org/repo=%s opt=%+v: %w", ownrepo, opt, err)
 			}
 			for _, commit := range commits {
-				c.Debugf("\tsha=%s", *commit.SHA)
+				c.Log.Debugf("\tsha=%s", *commit.SHA)
 				outchan <- OrgRepoCommit{ownrepo, commit}
 			}
 			if res == nil || res.NextPage == 0 {

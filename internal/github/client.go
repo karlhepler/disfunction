@@ -3,15 +3,16 @@ package github
 import (
 	ratelimit "github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v67/github"
+	"github.com/karlhepler/disfunction/internal/log"
 	"github.com/pkg/errors"
 )
 
 type Client struct {
 	GitHub *github.Client
-	Debugf func(string, ...any)
+	Log    log.Logger
 }
 
-func NewClient(ghtoken string) (*Client, error) {
+func NewClient(ghtoken string, log log.Logger) (*Client, error) {
 	gh, err := newGitHubClient(ghtoken)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -19,7 +20,7 @@ func NewClient(ghtoken string) (*Client, error) {
 
 	client := &Client{
 		GitHub: gh,
-		Debugf: func(format string, a ...any) {},
+		Log:    log,
 	}
 
 	return client, nil

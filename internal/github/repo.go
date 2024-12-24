@@ -19,13 +19,13 @@ func (c *Client) ListReposByOrg(ctx context.Context, org Org) (<-chan *github.Re
 
 		for {
 			org := org.String()
-			c.Debugf("GitHub.Repositories.ListByOrg(org=%s, page=%d)", org, opt.Page)
+			c.Log.Debugf("GitHub.Repositories.ListByOrg(org=%s, page=%d)", org, opt.Page)
 			repos, res, err := c.GitHub.Repositories.ListByOrg(ctx, org, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing repos by org, org=%s opt%+v", org, opt)
 			}
 			for _, repo := range repos {
-				c.Debugf("\trepo=%s", *repo.FullName)
+				c.Log.Debugf("\trepo=%s", *repo.FullName)
 				outchan <- repo
 			}
 			if res == nil || res.NextPage == 0 {
