@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/go-github/v67/github"
@@ -60,6 +61,10 @@ func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner Owner, d
 			go channel.Forward(errs, errchan)
 			channel.Forward(commits, outchan)
 		}
+
+		for err := range errchan {
+			log.Println(err)
+		}
 	}()
 	return outchan, errchan
 }
@@ -92,46 +97,3 @@ func (c *Client) ListOwnerRepoCommitsByDateRange(ctx context.Context, ownrepo Ow
 	}()
 	return outchan, errchan
 }
-
-// func (c *Client) ListOwnerCommitsByDateRange(ctx context.Context, owner string, range [2]time.Time, outchan chan<- RepositoryCommit, errchan chan<- error) {
-// 	defer close(outchan)
-// 	defer close(errchan)
-
-// 	repoChan, repoErrChan := make(chan *github.Repository), make(chan error)
-// 	go c.ListOwnerRepos(ctx, owner, repoChan, repoErrChan)
-// 	go channel.Forward(repoErrChan, errchan)
-
-// 	for repo := range repoChan {
-// 		commitChan, commitErrChan := make(chan *github.RepositoryCommit), make(chan error)
-// 		go c.ListRepoCommitsByDateRange(ctx, [2]string{owner, *repo.Name}, range, commitChan, commitErrChan)
-// 		go channel.Forward(commitErrChan, errchan)
-// 		for commit := range commitChan {
-// 			outchan <- RepositoryCommit{commit, owner, *repo.Name}
-// 		}
-// 	}
-// }
-
-// func (c *Client) ListRepoCommitsByDateRange(ctx context.Context, ownerRepo [2]string, range [2]time.Time, outchan chan<- *github.RepositoryCommit, errchan chan<- error) {
-// 	defer close(outchan)
-// 	defer close(errchan)
-
-// 	opt := &github.CommitsListOptions{
-// 		Since:       range[0],
-// 		Until:       range[1],
-// 		ListOptions: github.ListOptions{PerPage: 100},
-// 	}
-
-// 	for {
-// 		commits, res, err := c.GitHub.Repositories.ListCommits(ctx, ownerRepo[0], ownerRepo[1], opt)
-// 		if err != nil {
-// 			errchan <- fmt.Errorf("error listing repository commits, owner=%s repo=%s opt%+v: %w", ownerRepo[0], ownerRepo[1], opt, err)
-// 		}
-// 		for _, commit := range commits {
-// 			outchan <- commit
-// 		}
-// 		if res == nil || res.NextPage == 0 {
-// 			break
-// 		}
-// 		opt.Page = res.NextPage
-// 	}
-// }
