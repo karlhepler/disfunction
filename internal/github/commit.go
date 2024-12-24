@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v67/github"
+	"github.com/karlhepler/disfunction/internal/channel"
 )
 
 type listCommitsConfig struct {
@@ -74,9 +75,7 @@ func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-
 				}
 			}(errs)
 
-			for commit := range commits {
-				outchan <- commit
-			}
+			channel.Forward(commits, outchan)
 		}
 
 		wg.Wait()
