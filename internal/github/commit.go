@@ -45,7 +45,7 @@ func (c *Client) ListOwnerRepoCommitsByDateRange(ctx context.Context, ownrepo Ow
 		for {
 			owner, repo := ownrepo.OwnerStr(), ownrepo.RepoStr()
 			c.Debugf("GitHub.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", owner, repo, opt.Page)
-			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, ownrepo.OwnerStr(), ownrepo.RepoStr(), opt)
+			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, owner, repo, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing owner/repository commits; owner/repo=%s opt=%+v: %w", ownrepo, opt, err)
 			}
