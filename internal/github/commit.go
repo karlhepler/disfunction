@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v67/github"
-	"github.com/karlhepler/disfunction/internal/channel"
 )
 
 type listCommitsConfig struct {
@@ -49,15 +48,35 @@ func (c *Client) ListCommits(ctx context.Context, opts ...listCommitsOption) (<-
 		var wg sync.WaitGroup
 
 		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner))
-		channel.GoForward(&wg, errs, errchan) // TODO(karlhepler): Make a Forward wrapping function that lets me set a Sprintf string to wrap over the error
-		for repo := range repos {
-			repo := Repo{
-				Owner: Owner(*repo.Owner.Login),
-				Name:  *repo.Name,
+		wg.Add(1)
+		go func(errs <-chan error) {
+			defer wg.Done()
+			for err := range errs {
+				errchan <- err
 			}
-			commits, errs := c.ListCommitsByRepo(ctx, repo)
-			channel.GoForward(&wg, errs, errchan)
-			channel.GoForward(&wg, commits, outchan)
+		}(errs)
+
+		for repo := range repos {
+			commits, errs := c.ListCommitsByRepo(ctx,
+				Repo{
+					Owner: Owner(*repo.Owner.Login),
+					Name:  *repo.Name,
+				},
+				ListCommitsByRepoSince(config.since),
+				ListCommitsByRepoUntil(config.until),
+			)
+
+			wg.Add(1)
+			go func(errs <-chan error) {
+				defer wg.Done()
+				for err := range errs {
+					errchan <- err
+				}
+			}(errs)
+
+			for commit := range commits {
+				outchan <- commit
+			}
 		}
 
 		wg.Wait()

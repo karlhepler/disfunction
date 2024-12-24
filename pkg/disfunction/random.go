@@ -2,6 +2,7 @@ package disfunction
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/karlhepler/disfunction/internal/github"
@@ -36,20 +37,35 @@ type RandomMsg struct {
 func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) error {
 	ctx := req.Context
 	owner := github.Owner(req.Owner)
+	var wg sync.WaitGroup
 
 	commits, errs := hdl.GitHub.ListCommits(ctx,
 		github.FilterCommitsByOwner(owner),
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
 	)
-	go hdl.HandleErrs(errs, res)
+	wg.Add(1)
+	go func(errs <-chan error) {
+		defer wg.Done()
+		for err := range errs {
+			hdl.HandleErr(err)
+		}
+	}(errs)
 
 	patches, errs := hdl.GitHub.ListPatchesByCommits(ctx, commits)
-	go hdl.HandleErrs(errs, res)
+	wg.Add(1)
+	go func(errs <-chan error) {
+		defer wg.Done()
+		for err := range errs {
+			hdl.HandleErr(err)
+		}
+	}(errs)
 
 	for patch := range patches {
 		res.Send(RandomMsg{Patch: patch})
 	}
+
+	wg.Wait()
 
 	return nil
 }
