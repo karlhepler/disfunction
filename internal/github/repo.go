@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-github/v67/github"
 )
 
-func (c *Client) ListOwnerRepos(ctx context.Context, owner Owner) (<-chan *github.Repository, <-chan error) {
+func (c *Client) ListReposByOwner(ctx context.Context, owner Owner) (<-chan *github.Repository, <-chan error) {
 	outchan, errchan := make(chan *github.Repository), make(chan error)
 	go func() {
 		defer close(outchan)

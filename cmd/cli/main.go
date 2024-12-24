@@ -21,6 +21,11 @@ func main() {
 				Usage: `Display a random function
 chosen from all repositories within a date range.`,
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "owner",
+						Usage:    "The owner of the repositories.",
+						Required: true,
+					},
 					&cli.TimestampFlag{
 						Name: "since",
 						Usage: `Only commits after this date will be returned.
