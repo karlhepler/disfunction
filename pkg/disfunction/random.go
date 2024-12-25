@@ -1,7 +1,10 @@
 package disfunction
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,15 +54,51 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 	// list all patches from commits
 	patches, errs := hdl.GitHub.ListPatchesByCommits(ctx, commits)
 	channel.GoForEach(&wg, errs, hdl.HandleErr)
-	channel.ForEach(patches, func(patch github.Patch) {
-		res.Send(RandomMsg{Patch: patch})
-	})
 
 	// list all new function declarations for all patches
+	channel.ForEach(patches, func(patch github.Patch) {
+		err := forEachAddedFunc(patch.Patch, matchGoFunc, func(line string) {
+			fmt.Println(line)
+		})
+
+		if err != nil {
+			hdl.HandleErr(err)
+		}
+	})
 
 	wg.Wait()
 }
 
 func (hdl *RandomHandler) HandleErr(err error) {
 	hdl.Log.Error(err)
+}
+
+func forEachLine(s string, cb func(string)) error {
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	for scanner.Scan() {
+		cb(scanner.Text())
+	}
+	return scanner.Err()
+}
+
+func forEachAddedLine(s string, cb func(string)) error {
+	return forEachLine(s, func(line string) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+") {
+			cb(line[1:])
+		}
+	})
+}
+
+func forEachAddedFunc(s string, match func(string) bool, cb func(string)) error {
+	return forEachAddedLine(s, func(line string) {
+		line = strings.TrimSpace(line)
+		if match(line) {
+			cb(line)
+		}
+	})
+}
+
+func matchGoFunc(line string) bool {
+	return strings.HasPrefix(line, "func ")
 }
