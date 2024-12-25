@@ -56,13 +56,14 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 
 	// list all new function declarations for all patches
 	channel.ForEach(patches, func(patch github.Patch) {
-		var onMatch = func(line string) {
-			fmt.Println(line)
+		var onLineMatch = func(line string) {
+			fmt.Println(patch)
+			return
 		}
 
 		if err := parse.ForEachLineMatch(
-			patch.Patch, onMatch,
-			parse.MatchGitAdd, parse.MatchGoFunc,
+			patch.Patch, onLineMatch,
+			parse.MatchAll(parse.MatchGitAdd, parse.MatchGoFunc),
 		); err != nil {
 			hdl.HandleErr(err)
 		}

@@ -39,6 +39,7 @@ type Patch struct {
 }
 
 func (patch Patch) String() string {
+	// TODO(karlhepler): Work on this to collect the infomration I need
 	return fmt.Sprintf(dedent.Dedent(`
 		---
 		Repo: %s

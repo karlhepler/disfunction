@@ -15,10 +15,9 @@ func ForEachLine(s string, onLine func(string)) error {
 	return scanner.Err()
 }
 
-// MatchAll by default. Wrap your list of matchers in MatchOne for "OR" behavior.
-func ForEachLineMatch(s string, onMatch func(string), matchers ...LineMatcher) error {
+func ForEachLineMatch(s string, onMatch func(string), match LineMatcher) error {
 	return ForEachLine(s, func(line string) {
-		if MatchAll(matchers...)(line) {
+		if match(line) {
 			onMatch(line[1:])
 		}
 	})
