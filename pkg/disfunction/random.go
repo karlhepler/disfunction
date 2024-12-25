@@ -1,16 +1,15 @@
 package disfunction
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/karlhepler/disfunction/internal/channel"
 	"github.com/karlhepler/disfunction/internal/github"
 	"github.com/karlhepler/disfunction/internal/log"
+	"github.com/karlhepler/disfunction/internal/parse"
 )
 
 type RandomHandler struct {
@@ -57,11 +56,14 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 
 	// list all new function declarations for all patches
 	channel.ForEach(patches, func(patch github.Patch) {
-		err := forEachAddedFunc(patch.Patch, matchGoFunc, func(line string) {
+		var onMatch = func(line string) {
 			fmt.Println(line)
-		})
+		}
 
-		if err != nil {
+		if err := parse.ForEachLineMatch(
+			patch.Patch, onMatch,
+			parse.MatchGitAdd, parse.MatchGoFunc,
+		); err != nil {
 			hdl.HandleErr(err)
 		}
 	})
@@ -71,34 +73,4 @@ func (hdl *RandomHandler) Handle(req RandomReq, res RandomRes) {
 
 func (hdl *RandomHandler) HandleErr(err error) {
 	hdl.Log.Error(err)
-}
-
-func forEachLine(s string, cb func(string)) error {
-	scanner := bufio.NewScanner(strings.NewReader(s))
-	for scanner.Scan() {
-		cb(scanner.Text())
-	}
-	return scanner.Err()
-}
-
-func forEachAddedLine(s string, cb func(string)) error {
-	return forEachLine(s, func(line string) {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "+") {
-			cb(line[1:])
-		}
-	})
-}
-
-func forEachAddedFunc(s string, match func(string) bool, cb func(string)) error {
-	return forEachAddedLine(s, func(line string) {
-		line = strings.TrimSpace(line)
-		if match(line) {
-			cb(line)
-		}
-	})
-}
-
-func matchGoFunc(line string) bool {
-	return strings.HasPrefix(line, "func ")
 }
