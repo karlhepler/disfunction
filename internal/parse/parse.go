@@ -15,21 +15,10 @@ func ForEachLine(s string, onLine func(string)) error {
 	return scanner.Err()
 }
 
+// MatchAll by default. Wrap your list of matchers in MatchOne for "OR" behavior.
 func ForEachLineMatch(s string, onMatch func(string), matchers ...LineMatcher) error {
 	return ForEachLine(s, func(line string) {
-		// If there are no matchers, then match everything.
-		isMatch := len(matchers) == 0
-
-		// matchers are integrated with OR
-		// if any single matcher matches, then it's a match
-		for _, match := range matchers {
-			isMatch = isMatch || match(line)
-			if isMatch {
-				break
-			}
-		}
-
-		if isMatch {
+		if MatchAll(matchers...)(line) {
 			onMatch(line[1:])
 		}
 	})
@@ -41,6 +30,41 @@ func MatchGitAdd(line string) bool {
 }
 
 func MatchGoFunc(line string) bool {
-	line = strings.TrimSpace(line)
 	return strings.Contains(line, "func ")
+}
+
+// All matchers must match.
+// If any one doesn't match, then it doesn't match.
+// If there are no matchers defined, then it matches everything.
+func MatchAll(matchers ...LineMatcher) LineMatcher {
+	return func(line string) bool {
+		var isMatch = true
+
+		for _, match := range matchers {
+			isMatch = isMatch && match(line)
+			if !isMatch {
+				break
+			}
+		}
+
+		return isMatch
+	}
+}
+
+// Only one matcher must match.
+// If ALL of them don't match, then it doesn't match.
+// If there are no matchers defined, then it matches everything.
+func MatchOne(matchers ...LineMatcher) LineMatcher {
+	return func(line string) bool {
+		var isMatch = false
+
+		for _, match := range matchers {
+			isMatch = isMatch || match(line)
+			if isMatch {
+				break
+			}
+		}
+
+		return len(matchers) == 0 || isMatch
+	}
 }
