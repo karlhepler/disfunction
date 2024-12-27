@@ -12,8 +12,7 @@ import (
 	"github.com/karlhepler/disfunction/internal/parse"
 )
 
-// Disfunction is an implementation of one
-// possible solution for the following use case:
+// Disfunction one possible implementation enabling this use case:
 // TODO(karlhepler): generate this comment on each handler.
 type Disfunction struct {
 	gh  *github.Client
@@ -45,14 +44,12 @@ func (res DisfunctionRes) Context() context.Context {
 	return res.Ctx
 }
 
-// Handle is a usecase.Handler
-
-// TODO(karlhepler): automatically run something
-// to generate these comments every time an
-// implementation of it is found. Preferrably on
-// save. I wonder if there is a way to tap into
-// go fmt to do this. That would be automatic
-// and would also work for most developers.
+// Disfunction.Handle is a usecase.Handler
+//
+// TODO(karlhepler): automatically run something to generate these comments
+// every time an implementation of it is found. Preferrably on save. I wonder
+// if there is a way to tap into go fmt to do this. That would be automatic and
+// would also work for most developers.
 func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	ctx := req.Context()
 	owner := github.Owner(req.Owner)
@@ -64,15 +61,16 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
 	)
-	channel.GoForEach(&wg, errs, hdl.log.Error)
+	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	// list all patches from commits
 	patches, errs := hdl.gh.ListPatchesByCommits(ctx, commits)
-	channel.GoForEach(&wg, errs, hdl.log.Error)
+	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	// list all new function declarations for all patches
-	channel.ForEach(patches, func(patch github.Patch) {
+	channel.ForEach(ctx, patches, func(patch github.Patch) {
 		var onLineMatch = func(line string) {
+			// TODO(karlhepler): finish this
 			fmt.Println(line)
 			return
 		}

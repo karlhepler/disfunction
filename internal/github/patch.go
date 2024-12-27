@@ -13,7 +13,7 @@ func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit
 		defer close(outchan)
 		defer close(errchan)
 
-		channel.ForEach(commits, func(commit Commit) {
+		channel.ForEach(ctx, commits, func(commit Commit) {
 			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
 			meta, res, err := c.gh.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, nil)
 			if err != nil {
