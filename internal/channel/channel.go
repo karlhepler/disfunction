@@ -45,6 +45,9 @@ func GoForEach[T any](ctx context.Context, wg *sync.WaitGroup, src <-chan T, cal
 	}()
 }
 
+type AsyncFunc[T any] func(callback func(outchan chan T, errchan chan error) (<-chan T, <-chan error))
+type ProcessorFunc[T any] func(context.Context, <-chan T) AsyncFunc[T]
+
 // type Processor func[T any](context.Context, <-chan T) Async[T]
 // ^ Go doesn't allow generic function types.
 //	 I could probably define an interface instead.

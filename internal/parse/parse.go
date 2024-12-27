@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type LineMatcher func(line string) bool
+type LineMatcherFunc func(line string) bool
 
 func ForEachLine(s string, onLine func(string)) error {
 	scanner := bufio.NewScanner(strings.NewReader(s))
@@ -15,32 +15,28 @@ func ForEachLine(s string, onLine func(string)) error {
 	return scanner.Err()
 }
 
-func ForEachLineMatch(s string, onMatch func(string), match LineMatcher) error {
+func ForEachLineMatch(s string, match MatcherFunc[string], onMatch func(string)) error {
 	return ForEachLine(s, func(line string) {
 		if match(line) {
-			onMatch(line[1:])
+			onMatch(line)
 		}
 	})
 }
 
-func MatchGitAdd(line string) bool {
-	line = strings.TrimSpace(line)
-	return strings.HasPrefix(line, "+")
-}
+type MatcherFunc[T any] func(T) bool
 
-func MatchGoFunc(line string) bool {
-	return strings.Contains(line, "func ")
-}
+// TODO(karlhepler): create ForEach
+// TODO(karlhepler): create ForEachMatch
 
 // All matchers must match.
 // If any one doesn't match, then it doesn't match.
 // If there are no matchers defined, then it matches everything.
-func MatchAll(matchers ...LineMatcher) LineMatcher {
-	return func(line string) bool {
+func MatchAll[T any](matchers ...MatcherFunc[T]) MatcherFunc[T] {
+	return func(t T) bool {
 		var isMatch = true
 
 		for _, match := range matchers {
-			isMatch = isMatch && match(line)
+			isMatch = isMatch && match(t)
 			if !isMatch {
 				break
 			}
@@ -53,12 +49,12 @@ func MatchAll(matchers ...LineMatcher) LineMatcher {
 // Only one matcher must match.
 // If ALL of them don't match, then it doesn't match.
 // If there are no matchers defined, then it matches everything.
-func MatchOne(matchers ...LineMatcher) LineMatcher {
-	return func(line string) bool {
+func MatchOne[T any](matchers ...MatcherFunc[T]) MatcherFunc[T] {
+	return func(t T) bool {
 		var isMatch = false
 
 		for _, match := range matchers {
-			isMatch = isMatch || match(line)
+			isMatch = isMatch || match(t)
 			if isMatch {
 				break
 			}

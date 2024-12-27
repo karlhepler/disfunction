@@ -11,10 +11,28 @@ import (
 	"github.com/karlhepler/disfunction/internal/funk"
 )
 
+type Commit struct {
+	Repo
+	*github.RepositoryCommit
+}
+
 type listCommitsConfig struct {
-	owner Owner
-	since time.Time
-	until time.Time
+	owner   Owner
+	since   time.Time
+	until   time.Time
+	commits []Commit
+}
+
+type loggerCtxKey struct{}
+
+func (key loggerCtxKey) String() string {
+	return "loggerCtxKey"
+}
+
+type ghCtxKey struct{}
+
+func (key ghCtxKey) String() string {
+	return "ghCtxKey"
 }
 
 func FilterCommitsByOwner(owner Owner) funk.Option[listCommitsConfig] {
@@ -59,6 +77,33 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 	})
 }
 
+func (c *Client) ListDetailedCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
+	commits, listCommitsErrs := c.ListCommits(ctx, opts...)
+	return channel.Async(func(outchan chan Commit, errchan chan error) {
+		var wg sync.WaitGroup
+		channel.GoForward(ctx, &wg, listCommitsErrs, errchan)
+
+		channel.ForEach(ctx, commits, func(commit Commit) {
+			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
+			detailedCommit, res, err := c.gh.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, nil)
+			if err != nil {
+				errchan <- fmt.Errorf("error getting commit; repo=%s sha=%s", commit.Repo, *commit.SHA)
+			}
+
+			outchan <- Commit{
+				Repo:             commit.Repo,
+				RepositoryCommit: detailedCommit,
+			}
+
+			if res == nil {
+				return
+			}
+		})
+
+		wg.Wait()
+	})
+}
+
 type listCommitsByRepoConfig struct {
 	since time.Time
 	until time.Time
@@ -80,8 +125,13 @@ func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...funk.
 	var config = funk.ConfigWithOptions[listCommitsByRepoConfig](opts...)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		opt := &github.CommitsListOptions{
-			Since:       config.since,
-			Until:       config.until,
+			Since: config.since,
+			Until: config.until,
+			/* Path: "go.mod",
+				^ I can't use this here, but thought I'd write a note about it.
+				This tells GitHub to only return commits that include this path.
+			  In this example, only commits that affected `go.mod` will be returned.
+			*/
 			ListOptions: github.ListOptions{PerPage: 100},
 		}
 

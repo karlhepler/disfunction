@@ -9,6 +9,15 @@ import (
 	"github.com/karlhepler/disfunction/internal/funk"
 )
 
+type Repo struct {
+	Owner
+	Name string
+}
+
+func (r Repo) String() string {
+	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
+}
+
 type listReposConfig struct {
 	owner Owner
 }

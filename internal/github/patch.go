@@ -5,7 +5,25 @@ import (
 	"fmt"
 
 	"github.com/karlhepler/disfunction/internal/channel"
+	"github.com/lithammer/dedent"
 )
+
+type Patch struct {
+	Commit
+	Patch string
+}
+
+func (patch Patch) String() string {
+	// TODO(karlhepler): Work on this to collect the infomration I need
+	return fmt.Sprintf(dedent.Dedent(`
+		---
+		Repo: %s
+		Author: %s
+		Commit SHA: %s
+		---
+		%s
+	`), patch.Repo, *patch.Author.Login, *patch.SHA, patch.Patch)
+}
 
 func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit) (<-chan Patch, <-chan error) {
 	return channel.Async(func(outchan chan Patch, errchan chan error) {
