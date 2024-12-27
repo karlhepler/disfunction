@@ -8,8 +8,8 @@ import (
 )
 
 type Client struct {
-	GitHub *github.Client
-	Log    log.Logger
+	gh  *github.Client
+	log log.Logger
 }
 
 func NewClient(ghtoken string, log log.Logger) (*Client, error) {
@@ -18,18 +18,13 @@ func NewClient(ghtoken string, log log.Logger) (*Client, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	client := &Client{
-		GitHub: gh,
-		Log:    log,
-	}
-
-	return client, nil
+	return &Client{gh, log}, nil
 }
 
 func newGitHubClient(ghtoken string) (*github.Client, error) {
-	rl, err := ratelimit.NewRateLimitWaiterClient(nil)
+	rateLimiter, err := ratelimit.NewRateLimitWaiterClient(nil)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return github.NewClient(rl).WithAuthToken(ghtoken), nil
+	return github.NewClient(rateLimiter).WithAuthToken(ghtoken), nil
 }

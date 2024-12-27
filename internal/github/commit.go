@@ -105,14 +105,14 @@ func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...listC
 		}
 
 		for {
-			c.Log.Debugf("GitHub.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", repo.Owner, repo, opt.Page)
-			commits, res, err := c.GitHub.Repositories.ListCommits(ctx, repo.Owner.String(), repo.Name, opt)
+			c.log.Debugf("*github.Client.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", repo.Owner, repo, opt.Page)
+			commits, res, err := c.gh.Repositories.ListCommits(ctx, repo.Owner.String(), repo.Name, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing commits by repo; repo=%s opt=%+v: %w", repo, opt, err)
 			}
 
 			for _, commit := range commits {
-				c.Log.Debugf("\tsha=%s", *commit.SHA)
+				c.log.Debugf("\tsha=%s", *commit.SHA)
 				outchan <- Commit{repo, commit}
 			}
 

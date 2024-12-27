@@ -36,15 +36,15 @@ func (c *Client) ListRepos(ctx context.Context, opts ...listReposOption) (<-chan
 		}
 
 		for {
-			c.Log.Debugf("GitHub.Repositories.ListByAuthenticatedUser(page=%d)", opt.Page)
-			repos, res, err := c.GitHub.Repositories.ListByAuthenticatedUser(ctx, opt)
+			c.log.Debugf("*github.Client.Repositories.ListByAuthenticatedUser(page=%d)", opt.Page)
+			repos, res, err := c.gh.Repositories.ListByAuthenticatedUser(ctx, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing repos by authenticated user; opt=%+v: %w", opt, err)
 			}
 
 			for _, repo := range repos {
 				if owner == "" || owner == *repo.Owner.Login {
-					c.Log.Debugf("\trepo=%s", *repo.FullName)
+					c.log.Debugf("\trepo=%s", *repo.FullName)
 					outchan <- repo
 				}
 			}

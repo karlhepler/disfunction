@@ -7,7 +7,7 @@ import (
 
 	"github.com/karlhepler/disfunction/internal/must"
 	"github.com/karlhepler/disfunction/internal/time"
-	"github.com/karlhepler/disfunction/pkg/disfunction"
+	"github.com/karlhepler/disfunction/pkg/handler"
 	"github.com/urfave/cli/v3"
 )
 
@@ -60,24 +60,26 @@ func main() {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					var output Output
-					output.EnableDebug = cmd.Bool("debug")
-
 					token := must.Env("GITHUB_TOKEN")
-					hdl, err := disfunction.NewRandomHandler(token, output)
+
+					enableDebugMode := cmd.Bool("debug")
+					log := NewConsoleLogger(enableDebugMode)
+
+					hdl, err := handler.NewDisfunction(token, log)
 					if err != nil {
-						hdl.HandleErr(err)
+						log.Error(err)
 						os.Exit(1)
 					}
 
-					req := disfunction.RandomReq{
-						Context: ctx,
-						Owner:   cmd.String("owner"),
-						Since:   cmd.Timestamp("since"),
-						Until:   cmd.Timestamp("until"),
+					req := handler.DisfunctionReq{
+						Ctx:   ctx,
+						Owner: cmd.String("owner"),
+						Since: cmd.Timestamp("since"),
+						Until: cmd.Timestamp("until"),
 					}
 
-					hdl.Handle(req, output)
+					sender := NewConsoleSender()
+					handler.Handle(hdl, req, sender) // enforce types before invoking the handler
 					return nil
 				},
 			},
