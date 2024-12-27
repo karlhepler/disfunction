@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -68,19 +67,10 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	// list all new function declarations for all patches
-	channel.ForEach(ctx, patches, func(patch github.Patch) {
-		var onLineMatch = func(line string) {
-			// TODO(karlhepler): finish this
-			fmt.Println(line)
-			return
-		}
-
-		if err := parse.ForEachLineMatch(
-			patch.Patch, onLineMatch,
-			parse.MatchAll(parse.MatchGitAdd, parse.MatchGoFunc),
-		); err != nil {
-			hdl.log.Error(err)
-		}
+	gofuncs, errs := parse.ListAddedGoFuncsByPatches(ctx, patches)
+	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
+	channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {
+		//
 	})
 
 	wg.Wait()

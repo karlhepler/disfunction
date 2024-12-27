@@ -5,31 +5,23 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v67/github"
+	"github.com/karlhepler/disfunction/internal/channel"
+	"github.com/karlhepler/disfunction/internal/funk"
 )
 
 type listReposConfig struct {
 	owner Owner
 }
 
-type listReposOption func(*listReposConfig)
-
-func FilterReposByOwner(owner Owner) listReposOption {
+func FilterReposByOwner(owner Owner) funk.Option[listReposConfig] {
 	return func(config *listReposConfig) {
 		config.owner = owner
 	}
 }
 
-func (c *Client) ListRepos(ctx context.Context, opts ...listReposOption) (<-chan *github.Repository, <-chan error) {
-	var config listReposConfig
-	for _, opt := range opts {
-		opt(&config)
-	}
-
-	outchan, errchan := make(chan *github.Repository), make(chan error)
-	go func() {
-		defer close(outchan)
-		defer close(errchan)
-
+func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposConfig]) (<-chan *github.Repository, <-chan error) {
+	var config = funk.ConfigWithOptions[listReposConfig](opts...)
+	return channel.Async(func(outchan chan *github.Repository, errchan chan error) {
 		owner := config.owner.String()
 		opt := &github.RepositoryListByAuthenticatedUserOptions{
 			ListOptions: github.ListOptions{PerPage: 100},
@@ -54,6 +46,5 @@ func (c *Client) ListRepos(ctx context.Context, opts ...listReposOption) (<-chan
 			}
 			opt.Page = res.NextPage
 		}
-	}()
-	return outchan, errchan
+	})
 }

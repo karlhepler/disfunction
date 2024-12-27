@@ -8,11 +8,7 @@ import (
 )
 
 func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit) (<-chan Patch, <-chan error) {
-	outchan, errchan := make(chan Patch), make(chan error)
-	go func() {
-		defer close(outchan)
-		defer close(errchan)
-
+	return channel.Async(func(outchan chan Patch, errchan chan error) {
 		channel.ForEach(ctx, commits, func(commit Commit) {
 			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
 			meta, res, err := c.gh.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, nil)
@@ -31,6 +27,5 @@ func (c *Client) ListPatchesByCommits(ctx context.Context, commits <-chan Commit
 				return
 			}
 		})
-	}()
-	return outchan, errchan
+	})
 }

@@ -11,10 +11,3 @@ func Env(key string) (val string) {
 	}
 	return val
 }
-
-func Val[T any](val T, err error) T {
-	if err != nil {
-		panic("[PANIC] required value: " + err.Error())
-	}
-	return val
-}
