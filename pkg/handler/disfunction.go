@@ -93,6 +93,7 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	// list all new function declarations for all patches
+	// TODO(karlhepler): I was thinking of renaming this to FilterPatchesBy.
 	gofuncs, errs := parse.ListAddedGoFuncsByPatches(ctx, patches)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 	channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {

@@ -25,9 +25,6 @@ func ForEachLineMatch(s string, match MatcherFunc[string], onMatch func(string))
 
 type MatcherFunc[T any] func(T) bool
 
-// TODO(karlhepler): create ForEach
-// TODO(karlhepler): create ForEachMatch
-
 // All matchers must match.
 // If any one doesn't match, then it doesn't match.
 // If there are no matchers defined, then it matches everything.
