@@ -21,6 +21,7 @@ type listCommitsConfig struct {
 	since   time.Time
 	until   time.Time
 	commits []Commit
+	repos   []Repo
 }
 
 type loggerCtxKey struct{}
@@ -41,6 +42,8 @@ func FilterCommitsByOwner(owner Owner) funk.Option[listCommitsConfig] {
 	}
 }
 
+func FilterCommitsByRepos(repos []Repo) funk.Option[listCommitsConfig]
+
 func ListCommitsSince(since time.Time) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
 		config.since = since
@@ -58,8 +61,20 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner))
-		channel.GoForward(ctx, &wg, errs, errchan)
+		var repos <-chan Repo
+		var errs <-chan error
+		if len(config.repos) > 0 {
+			repochan := make(chan Repo)
+			go func() {
+				for _, repo := range config.repos {
+					repochan <- repo
+				}
+			}()
+		} else {
+			repos, errs = c.ListRepos(ctx, FilterReposByOwner(config.owner))
+			channel.GoFwd(ctx, &wg, errs, errchan)
+		}
+
 		channel.ForEach(ctx, repos, func(repo *github.Repository) {
 			commits, errs := c.ListCommitsByRepo(ctx,
 				Repo{
@@ -69,8 +84,8 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 				ListCommitsByRepoSince(config.since),
 				ListCommitsByRepoUntil(config.until),
 			)
-			channel.GoForward(ctx, &wg, errs, errchan)
-			channel.GoForward(ctx, &wg, commits, outchan)
+			channel.GoFwd(ctx, &wg, errs, errchan)
+			channel.GoFwd(ctx, &wg, commits, outchan)
 		})
 
 		wg.Wait()
@@ -81,7 +96,7 @@ func (c *Client) ListDetailedCommits(ctx context.Context, opts ...funk.Option[li
 	commits, listCommitsErrs := c.ListCommits(ctx, opts...)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
-		channel.GoForward(ctx, &wg, listCommitsErrs, errchan)
+		channel.GoFwd(ctx, &wg, listCommitsErrs, errchan)
 
 		channel.ForEach(ctx, commits, func(commit Commit) {
 			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)

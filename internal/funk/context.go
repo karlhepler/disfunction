@@ -29,7 +29,7 @@ func GoGetContextVal[ContextVal any](ctx context.Context, key ContextKey) (Conte
 	})
 
 	var wg sync.WaitGroup
-	channel.GoForward(ctx, &wg, errs, errchan)
+	channel.GoFwd(ctx, &wg, errs, errchan)
 	log := <-outs
 	wg.Wait()
 

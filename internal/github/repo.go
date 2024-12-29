@@ -20,6 +20,7 @@ func (r Repo) String() string {
 
 type listReposConfig struct {
 	owner Owner
+	repos []Repo
 }
 
 func FilterReposByOwner(owner Owner) funk.Option[listReposConfig] {

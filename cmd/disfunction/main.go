@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
-	"github.com/karlhepler/disfunction/internal/must"
 	"github.com/karlhepler/disfunction/internal/time"
 	"github.com/karlhepler/disfunction/pkg/handler"
+	"github.com/lithammer/dedent"
 	"github.com/urfave/cli/v3"
 )
 
@@ -18,11 +19,20 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name:  "random",
-				Usage: "Display a random function chosen from all affiliated repositories within a date range.",
+				Usage: "Display a random function chosen from all affiliated repos within a date range.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:  "owner",
-						Usage: "Filter repositories by owner.",
+						Name: "owner",
+						Usage: dedent.Dedent(`Filter repos by owner.
+							If not defined, this will default to all repos GITHUB_TOKEN has access to.
+						`),
+					},
+					&cli.StringSliceFlag{
+						Name: "repos",
+						Usage: dedent.Dedent(`Filter repos by this allow list.
+							This must be used in conjunction with '--owner <value>'.
+							If not defined, this will allow all repos through.
+						`),
 					},
 					&cli.TimestampFlag{
 						Name:  "since",
@@ -60,22 +70,30 @@ func main() {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					token := must.Env("GITHUB_TOKEN")
+					token, ok := os.LookupEnv("GITHUB_TOKEN")
+					if !ok {
+						return fmt.Errorf("missing required env var GITHUB_TOKEN")
+					}
 
 					enableDebugMode := cmd.Bool("debug")
-					log := NewConsoleLogger(enableDebugMode)
-
-					hdl, err := handler.NewDisfunction(token, log)
+					console := NewConsoleLogger(enableDebugMode)
+					hdl, err := handler.NewDisfunction(token, console)
 					if err != nil {
-						log.Error(err)
-						os.Exit(1)
+						return fmt.Errorf("disfunction init failed: %w", err)
+					}
+
+					owner := cmd.String("owner")
+					repos := cmd.StringSlice("repos")
+					if len(repos) > 0 && owner == "" {
+						return fmt.Errorf("owner is required when setting repos")
 					}
 
 					req := handler.DisfunctionReq{
-						Ctx:   ctx,
-						Owner: cmd.String("owner"),
-						Since: cmd.Timestamp("since"),
-						Until: cmd.Timestamp("until"),
+						Ctx:       ctx,
+						Owner:     owner,
+						RepoNames: repos,
+						Since:     cmd.Timestamp("since"),
+						Until:     cmd.Timestamp("until"),
 					}
 
 					sender := NewConsoleSender()
@@ -87,6 +105,8 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Errorf("[FATAL] %w", err))
 	}
 }
+
+func run()
