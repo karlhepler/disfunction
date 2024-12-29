@@ -11,7 +11,7 @@ import (
 	"github.com/karlhepler/disfunction/internal/parse"
 )
 
-// TODO(karlhepler): Also have a way to call the most fequently called functions.
+// TODO(karlhepler):devex Also have a way to call the most fequently called functions.
 // That shouldn't be too hard. I'll just have to save state somewhere.
 // I'll need to consume all data in a timeline and present the most current
 // state, along with the ability to see more. That data could be used to power
@@ -27,7 +27,7 @@ import (
 // HTTP/2, as they are required for LSP communication.
 
 // Disfunction one possible implementation enabling this use case:
-// TODO(karlhepler): generate this comment on each handler.
+// TODO(karlhepler):devex generate this comment on each handler.
 type Disfunction struct {
 	gh  *github.Client
 	log log.Logger
@@ -61,7 +61,7 @@ func (res DisfunctionRes) Context() context.Context {
 
 // Disfunction.Handle is a usecase.Handler
 //
-// TODO(karlhepler): automatically run something to generate these comments
+// TODO(karlhepler):devex automatically run something to generate these comments
 // every time an implementation of it is found. Preferrably on save. I wonder
 // if there is a way to tap into go fmt to do this. That would be automatic and
 // would also work for most developers.
@@ -69,7 +69,7 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	var wg sync.WaitGroup
 
 	var ctx = req.Context()
-	var owner = github.Owner(req.Owner)
+	var owner = github.Owner{Login: req.Owner}
 	var repos = make([]github.Repo, len(req.RepoNames))
 	for i, name := range req.RepoNames {
 		repos[i] = github.Repo{
@@ -88,8 +88,6 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	// list all patches from commits
-	// TODO(karlhepler): combine this function and the next.
-	// The next function is essentially a config option for this function.
 	patches, errs := hdl.gh.ListPatchesByCommits(ctx, commits)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 

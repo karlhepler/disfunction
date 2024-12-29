@@ -24,25 +24,17 @@ type listCommitsConfig struct {
 	repos   []Repo
 }
 
-type loggerCtxKey struct{}
-
-func (key loggerCtxKey) String() string {
-	return "loggerCtxKey"
-}
-
-type ghCtxKey struct{}
-
-func (key ghCtxKey) String() string {
-	return "ghCtxKey"
-}
-
 func FilterCommitsByOwner(owner Owner) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
 		config.owner = owner
 	}
 }
 
-func FilterCommitsByRepos(repos []Repo) funk.Option[listCommitsConfig]
+func FilterCommitsByRepos(repos []Repo) funk.Option[listCommitsConfig] {
+	return func(config *listCommitsConfig) {
+		config.repos = repos
+	}
+}
 
 func ListCommitsSince(since time.Time) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
@@ -57,28 +49,28 @@ func ListCommitsUntil(until time.Time) funk.Option[listCommitsConfig] {
 }
 
 func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
-	var config = funk.ConfigWithOptions[listCommitsConfig](opts...)
+	var config = funk.ConfigWithOptions[listCommitsConfig](opts)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		var repos <-chan Repo
-		var errs <-chan error
-		if len(config.repos) > 0 {
-			repochan := make(chan Repo)
-			go func() {
-				for _, repo := range config.repos {
-					repochan <- repo
-				}
-			}()
-		} else {
-			repos, errs = c.ListRepos(ctx, FilterReposByOwner(config.owner))
-			channel.GoFwd(ctx, &wg, errs, errchan)
-		}
+		// var repos <-chan Repo
+		// var errs <-chan error
+		// if len(config.repos) > 0 {
+		// 	repochan := make(chan Repo)
+		// 	go func() {
+		// 		for _, repo := range config.repos {
+		// 			repochan <- repo
+		// 		}
+		// 	}()
+		// } else {
+		// }
 
+		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner), FilterReposByRepos(config.repos))
+		channel.GoFwd(ctx, &wg, errs, errchan)
 		channel.ForEach(ctx, repos, func(repo *github.Repository) {
 			commits, errs := c.ListCommitsByRepo(ctx,
 				Repo{
-					Owner: Owner(*repo.Owner.Login),
+					Owner: Owner{Login: *repo.Owner.Login},
 					Name:  *repo.Name,
 				},
 				ListCommitsByRepoSince(config.since),
@@ -137,7 +129,7 @@ func ListCommitsByRepoUntil(until time.Time) funk.Option[listCommitsByRepoConfig
 }
 
 func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...funk.Option[listCommitsByRepoConfig]) (<-chan Commit, <-chan error) {
-	var config = funk.ConfigWithOptions[listCommitsByRepoConfig](opts...)
+	var config = funk.ConfigWithOptions[listCommitsByRepoConfig](opts)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		opt := &github.CommitsListOptions{
 			Since: config.since,

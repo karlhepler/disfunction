@@ -1,7 +1,9 @@
 package github
 
-type Owner string
+type Owner struct {
+	Login string
+}
 
 func (o Owner) String() string {
-	return string(o)
+	return o.Login
 }

@@ -108,5 +108,3 @@ func main() {
 		log.Fatal(fmt.Errorf("[FATAL] %w", err))
 	}
 }
-
-func run()
