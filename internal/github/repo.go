@@ -3,7 +3,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/channel"
@@ -30,15 +29,9 @@ func FilterReposByOwner(owner Owner) funk.Option[listReposConfig] {
 	}
 }
 
-func FilterReposByRepos(repos []Repo) funk.Option[listReposConfig] {
-	return func(config *listReposConfig) {
-		config.repos = repos
-	}
-}
-
-func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposConfig]) (<-chan *github.Repository, <-chan error) {
+func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposConfig]) (<-chan Repo, <-chan error) {
 	var config = funk.ConfigWithOptions[listReposConfig](opts)
-	return channel.Async(func(outchan chan *github.Repository, errchan chan error) {
+	return channel.Async(func(outchan chan Repo, errchan chan error) {
 		opt := &github.RepositoryListByAuthenticatedUserOptions{
 			ListOptions: github.ListOptions{PerPage: 100},
 		}
@@ -51,14 +44,13 @@ func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposCon
 			}
 
 			for _, repo := range repos {
-				if !isOwnerMatch(config.owner, repo.Owner) {
-					continue
+				if isOwnerMatch(config.owner, repo.Owner) {
+					c.log.Debugf("\trepo=%s", *repo.FullName)
+					outchan <- Repo{
+						Owner: Owner{Login: *repo.Owner.Login},
+						Name:  *repo.Name,
+					}
 				}
-				if !isRepoMatch(config.repos, repo) {
-					continue
-				}
-				c.log.Debugf("\trepo=%s", *repo.FullName)
-				outchan <- repo
 			}
 
 			if res == nil || res.NextPage == 0 {
@@ -80,19 +72,4 @@ func isOwnerMatch(reference Owner, candidate *github.User) bool {
 		return false
 	}
 	return reference.Login == *candidate.Login
-}
-
-func isRepoMatch(allowlist []Repo, candidate *github.Repository) bool {
-	if len(allowlist) == 0 {
-		return true
-	}
-	if candidate == nil {
-		return false
-	}
-	if candidate.Name == nil {
-		return false
-	}
-	return slices.ContainsFunc(allowlist, func(repo Repo) bool {
-		return repo.Name == *candidate.Name
-	})
 }

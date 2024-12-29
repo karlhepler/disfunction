@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -95,7 +96,7 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	gofuncs, errs := parse.ListAddedGoFuncsByPatches(ctx, patches)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 	channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {
-		//
+		fmt.Println(gofunc.Line)
 	})
 
 	wg.Wait()

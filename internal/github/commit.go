@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -53,26 +54,14 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		// var repos <-chan Repo
-		// var errs <-chan error
-		// if len(config.repos) > 0 {
-		// 	repochan := make(chan Repo)
-		// 	go func() {
-		// 		for _, repo := range config.repos {
-		// 			repochan <- repo
-		// 		}
-		// 	}()
-		// } else {
-		// }
-
-		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner), FilterReposByRepos(config.repos))
+		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner))
 		channel.GoFwd(ctx, &wg, errs, errchan)
-		channel.ForEach(ctx, repos, func(repo *github.Repository) {
-			commits, errs := c.ListCommitsByRepo(ctx,
-				Repo{
-					Owner: Owner{Login: *repo.Owner.Login},
-					Name:  *repo.Name,
-				},
+		channel.ForEach(ctx, repos, func(repo Repo) {
+			if len(config.repos) > 0 && !slices.Contains(config.repos, repo) {
+				return
+			}
+
+			commits, errs := c.ListCommitsByRepo(ctx, repo,
 				ListCommitsByRepoSince(config.since),
 				ListCommitsByRepoUntil(config.until),
 			)
