@@ -14,18 +14,48 @@ type Repo struct {
 	Name string
 }
 
+type RepoAllowList []Repo
+
+func (list RepoAllowList) Allows(ghrepo *github.Repository) bool {
+	for _, repo := range list {
+		owner := repo.Owner.Login
+		repoName := repo.Name
+
+		if owner == "" && repoName == "" {
+			return true
+		}
+		if owner == "" && repoName != "" {
+			return repoName == *ghrepo.Name
+		}
+		if owner != "" && repoName == "" {
+			return owner == *ghrepo.Owner.Login
+		}
+		if owner != "" && repoName != "" {
+			return owner == *ghrepo.Owner.Login && repoName == *ghrepo.Name
+		}
+	}
+
+	return false // this should never be triggered
+}
+
 func (r Repo) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
 type listReposConfig struct {
 	owner Owner
-	repos []Repo
+	repos RepoAllowList
 }
 
-func FilterReposByOwner(owner Owner) funk.Option[listReposConfig] {
+func ListReposOwnedBy(owner Owner) funk.Option[listReposConfig] {
 	return func(config *listReposConfig) {
 		config.owner = owner
+	}
+}
+
+func ListReposExclusiveTo(repos []Repo) funk.Option[listReposConfig] {
+	return func(config *listReposConfig) {
+		config.repos = repos
 	}
 }
 
@@ -44,7 +74,7 @@ func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposCon
 			}
 
 			for _, repo := range repos {
-				if isOwnerMatch(config.owner, repo.Owner) {
+				if config.repos.Allows(repo) {
 					c.log.Debugf("\trepo=%s", *repo.FullName)
 					outchan <- Repo{
 						Owner: Owner{Login: *repo.Owner.Login},

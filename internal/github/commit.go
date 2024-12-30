@@ -3,7 +3,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -18,20 +17,14 @@ type Commit struct {
 }
 
 type listCommitsConfig struct {
-	owner   Owner
-	since   time.Time
-	until   time.Time
-	commits []Commit
-	repos   []Repo
+	since time.Time
+	until time.Time
+	// commits []Commit // I don't think I need this
+	repos      []Repo
+	withDetail bool
 }
 
-func FilterCommitsByOwner(owner Owner) funk.Option[listCommitsConfig] {
-	return func(config *listCommitsConfig) {
-		config.owner = owner
-	}
-}
-
-func FilterCommitsByRepos(repos []Repo) funk.Option[listCommitsConfig] {
+func ListCommitsInReposExclusiveTo(repos []Repo) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
 		config.repos = repos
 	}
@@ -49,23 +42,26 @@ func ListCommitsUntil(until time.Time) funk.Option[listCommitsConfig] {
 	}
 }
 
+func ListCommitsWithDetail() funk.Option[listCommitsConfig] {
+	return func(config *listCommitsConfig) {
+		config.withDetail = true
+	}
+}
+
 func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
 	var config = funk.ConfigWithOptions[listCommitsConfig](opts)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		repos, errs := c.ListRepos(ctx, FilterReposByOwner(config.owner))
+		repos, errs := c.ListRepos(ctx, ListReposExclusiveTo(config.repos))
 		channel.GoFwd(ctx, &wg, errs, errchan)
 		channel.ForEach(ctx, repos, func(repo Repo) {
-			if len(config.repos) > 0 && !slices.Contains(config.repos, repo) {
-				return
-			}
-
 			commits, errs := c.ListCommitsByRepo(ctx, repo,
 				ListCommitsByRepoSince(config.since),
 				ListCommitsByRepoUntil(config.until),
 			)
 			channel.GoFwd(ctx, &wg, errs, errchan)
+			// TODO(karlhepler): I need to change this
 			channel.GoFwd(ctx, &wg, commits, outchan)
 		})
 
