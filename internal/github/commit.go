@@ -20,13 +20,13 @@ type listCommitsConfig struct {
 	since time.Time
 	until time.Time
 	// commits []Commit // I don't think I need this
-	repos      []Repo
-	withDetail bool
+	repoAllowList []Repo
+	withDetail    bool
 }
 
 func ListCommitsInReposExclusiveTo(repos []Repo) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
-		config.repos = repos
+		config.repoAllowList = repos
 	}
 }
 
@@ -53,8 +53,18 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		repos, errs := c.ListRepos(ctx, ListReposExclusiveTo(config.repos))
-		channel.GoFwd(ctx, &wg, errs, errchan)
+		// If I have an allow list, and I can fill it with the right information, which I cane,
+		// then there is no reason to do this at all. If I give a list of repos,
+		// then just iterate over that list instead of doing this.
+		var repos <-chan Repo
+		var errs <-chan error
+		if len(config.repoAllowList) > 0 {
+			repos = channel.SendEachOnChannel(config.repoAllowList)
+		} else {
+			repos, errs = c.ListRepos(ctx)
+			channel.GoFwd(ctx, &wg, errs, errchan)
+		}
+
 		channel.ForEach(ctx, repos, func(repo Repo) {
 			commits, errs := c.ListCommitsByRepo(ctx, repo,
 				ListCommitsByRepoSince(config.since),
