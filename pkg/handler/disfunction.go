@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,10 +39,10 @@ func NewDisfunction(ghtoken string, log log.Logger) (*Disfunction, error) {
 }
 
 type DisfunctionReq struct {
-	Ctx           context.Context
-	Since         time.Time
-	Until         time.Time
-	FilterByRepos []github.Repo
+	Ctx   context.Context
+	Since time.Time
+	Until time.Time
+	Repos []*github.Repository
 }
 
 func (req DisfunctionReq) Context() context.Context {
@@ -49,12 +50,16 @@ func (req DisfunctionReq) Context() context.Context {
 }
 
 type DisfunctionRes struct {
-	Ctx   context.Context
-	Patch github.Patch
+	Ctx context.Context
+	// Patch github.Patch
 }
 
 func (res DisfunctionRes) Context() context.Context {
 	return res.Ctx
+}
+
+func (r DisfunctionRes) Send(res DisfunctionRes) {
+	//
 }
 
 // Disfunction.Handle is a usecase.Handler
@@ -68,14 +73,19 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 
 	var ctx = req.Context()
 
-	// list all commits
-	commits, errs := hdl.gh.ListDetailedCommits(ctx,
-		github.FilterCommitsByOwner(owner),
-		github.FilterCommitsByRepos(repos),
+	// List all detailed commits within a time range, filtered by OwerRepos
+	// If OwnerRepos.Repos is nil, then it defaults to true. This allows you to
+	// specify only the Owner and have it apply to all of that owner's repos.
+	commits, errs := hdl.gh.ListCommits(ctx,
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
+		github.ListCommitsExclusiveTo(req.Repos),
+		github.ListCommitsWithDetail(true),
 	)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
+	channel.ForEach(ctx, commits, func(commit github.Commit) {
+		fmt.Println("Howdy, ", commit.Author.String())
+	})
 
 	// list all patches from commits
 	// patches, errs := hdl.gh.ListPatchesByCommits(ctx, commits)

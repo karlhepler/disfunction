@@ -12,19 +12,18 @@ import (
 )
 
 type Commit struct {
-	Repo
+	*github.Repository
 	*github.RepositoryCommit
 }
 
 type listCommitsConfig struct {
-	since time.Time
-	until time.Time
-	// commits []Commit // I don't think I need this
-	repoAllowList []Repo
+	since         time.Time
+	until         time.Time
+	repoAllowList RepoAllowList
 	withDetail    bool
 }
 
-func ListCommitsInReposExclusiveTo(repos []Repo) funk.Option[listCommitsConfig] {
+func ListCommitsExclusiveTo(repos []*github.Repository) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
 		config.repoAllowList = repos
 	}
@@ -42,9 +41,9 @@ func ListCommitsUntil(until time.Time) funk.Option[listCommitsConfig] {
 	}
 }
 
-func ListCommitsWithDetail() funk.Option[listCommitsConfig] {
+func ListCommitsWithDetail(withDetail bool) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
-		config.withDetail = true
+		config.withDetail = withDetail
 	}
 }
 
@@ -53,58 +52,65 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		var wg sync.WaitGroup
 
-		// If I have an allow list, and I can fill it with the right information, which I cane,
-		// then there is no reason to do this at all. If I give a list of repos,
-		// then just iterate over that list instead of doing this.
-		var repos <-chan Repo
-		var errs <-chan error
-		if len(config.repoAllowList) > 0 {
-			repos = channel.SendEachOnChannel(config.repoAllowList)
-		} else {
-			repos, errs = c.ListRepos(ctx)
-			channel.GoFwd(ctx, &wg, errs, errchan)
-		}
+		allowedRepos, errs := c.ListRepos(ctx, ListReposAllowedBy(config.repoAllowList))
+		channel.GoFwd(ctx, &wg, errs, errchan)
 
-		channel.ForEach(ctx, repos, func(repo Repo) {
+		channel.ForEach(ctx, allowedRepos, func(repo *github.Repository) {
 			commits, errs := c.ListCommitsByRepo(ctx, repo,
 				ListCommitsByRepoSince(config.since),
 				ListCommitsByRepoUntil(config.until),
 			)
 			channel.GoFwd(ctx, &wg, errs, errchan)
-			// TODO(karlhepler): I need to change this
-			channel.GoFwd(ctx, &wg, commits, outchan)
+
+			if config.withDetail == true {
+				commits, errs = channel.Map(ctx, commits, func(commit Commit) (Commit, error) {
+					c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA)
+					detail, _, err := c.gh.Repositories.GetCommit(ctx, *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA, nil)
+					if err != nil {
+						return commit, fmt.Errorf("error getting commit; repo=%s sha=%s", *commit.Repository, *commit.SHA)
+					}
+
+					return Commit{
+						Repository:       commit.Repository,
+						RepositoryCommit: detail,
+					}, nil
+				})
+				channel.GoFwd(ctx, &wg, errs, errchan)
+			}
+
+			channel.Fwd(ctx, commits, outchan)
 		})
 
 		wg.Wait()
 	})
 }
 
-func (c *Client) ListDetailedCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
-	commits, listCommitsErrs := c.ListCommits(ctx, opts...)
-	return channel.Async(func(outchan chan Commit, errchan chan error) {
-		var wg sync.WaitGroup
-		channel.GoFwd(ctx, &wg, listCommitsErrs, errchan)
+// func (c *Client) ListDetailedCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
+// 	commits, listCommitsErrs := c.ListCommits(ctx, opts...)
+// 	return channel.Async(func(outchan chan Commit, errchan chan error) {
+// 		var wg sync.WaitGroup
+// 		channel.GoFwd(ctx, &wg, listCommitsErrs, errchan)
 
-		channel.ForEach(ctx, commits, func(commit Commit) {
-			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
-			detailedCommit, res, err := c.gh.Repositories.GetCommit(ctx, commit.Repo.Owner.String(), commit.Repo.Name, *commit.SHA, nil)
-			if err != nil {
-				errchan <- fmt.Errorf("error getting commit; repo=%s sha=%s", commit.Repo, *commit.SHA)
-			}
+// 		channel.ForEach(ctx, commits, func(commit Commit) {
+// 			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
+// 			detailedCommit, res, err := c.gh.Repositories.GetCommit(ctx, *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA, nil)
+// 			if err != nil {
+// 				errchan <- fmt.Errorf("error getting commit; repo=%s sha=%s", commit.Repo, *commit.SHA)
+// 			}
 
-			outchan <- Commit{
-				Repo:             commit.Repo,
-				RepositoryCommit: detailedCommit,
-			}
+// 			outchan <- Commit{
+// 				Repo:             commit.Repo,
+// 				RepositoryCommit: detailedCommit,
+// 			}
 
-			if res == nil {
-				return
-			}
-		})
+// 			if res == nil {
+// 				return
+// 			}
+// 		})
 
-		wg.Wait()
-	})
-}
+// 		wg.Wait()
+// 	})
+// }
 
 type listCommitsByRepoConfig struct {
 	since time.Time
@@ -123,7 +129,7 @@ func ListCommitsByRepoUntil(until time.Time) funk.Option[listCommitsByRepoConfig
 	}
 }
 
-func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...funk.Option[listCommitsByRepoConfig]) (<-chan Commit, <-chan error) {
+func (c *Client) ListCommitsByRepo(ctx context.Context, repo *github.Repository, opts ...funk.Option[listCommitsByRepoConfig]) (<-chan Commit, <-chan error) {
 	var config = funk.ConfigWithOptions[listCommitsByRepoConfig](opts)
 	return channel.Async(func(outchan chan Commit, errchan chan error) {
 		opt := &github.CommitsListOptions{
@@ -139,7 +145,7 @@ func (c *Client) ListCommitsByRepo(ctx context.Context, repo Repo, opts ...funk.
 
 		for {
 			c.log.Debugf("*github.Client.Repositories.ListCommits(owner=%s, repo=%s, page=%d)", repo.Owner, repo, opt.Page)
-			commits, res, err := c.gh.Repositories.ListCommits(ctx, repo.Owner.String(), repo.Name, opt)
+			commits, res, err := c.gh.Repositories.ListCommits(ctx, *repo.Owner.Login, *repo.Name, opt)
 			if err != nil {
 				errchan <- fmt.Errorf("error listing commits by repo; repo=%s opt=%+v: %w", repo, opt, err)
 			}

@@ -23,6 +23,34 @@ func FwdToOutchan[T any](ctx context.Context, src <-chan T, outchan <-chan T) <-
 	return out2chan
 }
 
+func Filter[T any](ctx context.Context, in <-chan T, out chan<- T, predicate func(T) bool) {
+	for val := range in {
+		if predicate(val) {
+			out <- val
+		}
+	}
+}
+
+type MapperFunc[IN, OUT any] func(IN) (OUT, error)
+
+func Map[IN, OUT any](ctx context.Context, in <-chan IN, mapper MapperFunc[IN, OUT]) (<-chan OUT, <-chan error) {
+	out, errs := make(chan OUT), make(chan error)
+	go func() {
+		defer close(out)
+
+		for val := range in {
+			mval, merr := mapper(val)
+			if merr != nil {
+				errs <- merr
+				return // assume there is no value (no way to check nil)
+			}
+			out <- mval
+		}
+
+	}()
+	return out, errs
+}
+
 func ForEach[T any](ctx context.Context, src <-chan T, callback func(T)) {
 	for {
 		select {
@@ -42,6 +70,14 @@ func GoFwd[T any](ctx context.Context, wg *sync.WaitGroup, src <-chan T, dest ch
 	go func() {
 		defer wg.Done()
 		Fwd(ctx, src, dest)
+	}()
+}
+
+func GoFilter[T any](ctx context.Context, wg *sync.WaitGroup, in <-chan T, out chan<- T, predicate func(T) bool) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		Filter(ctx, in, out, predicate)
 	}()
 }
 

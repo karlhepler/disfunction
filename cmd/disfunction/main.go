@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/karlhepler/disfunction/internal/github"
 	"github.com/karlhepler/disfunction/internal/time"
 	"github.com/karlhepler/disfunction/pkg/handler"
 	"github.com/lithammer/dedent"
@@ -82,18 +84,29 @@ func main() {
 						return fmt.Errorf("disfunction init failed: %w", err)
 					}
 
-					owner := cmd.String("owner")
-					repos := cmd.StringSlice("repos")
-					if len(repos) > 0 && owner == "" {
-						return fmt.Errorf("owner is required when setting repos")
+					ownerRepos := cmd.StringSlice("owner-repos")
+					repos := make([]*github.Repository, len(ownerRepos))
+					for _, ownerRepo := range ownerRepos {
+						repo := &github.Repository{}
+
+						parts := strings.Split(ownerRepo, "/")
+						if ownerLogin := parts[0]; ownerLogin != "" {
+							repo.Owner = &github.User{
+								Login: &ownerLogin,
+							}
+						}
+						if len(parts) > 1 {
+							if repoName := parts[1]; repoName != "" {
+								repo.Name = &repoName
+							}
+						}
 					}
 
 					req := handler.DisfunctionReq{
-						Ctx:       ctx,
-						Owner:     owner,
-						RepoNames: repos,
-						Since:     cmd.Timestamp("since"),
-						Until:     cmd.Timestamp("until"),
+						Ctx:   ctx,
+						Repos: repos,
+						Since: cmd.Timestamp("since"),
+						Until: cmd.Timestamp("until"),
 					}
 
 					sender := NewConsoleSender()

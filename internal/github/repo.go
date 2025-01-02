@@ -9,59 +9,69 @@ import (
 	"github.com/karlhepler/disfunction/internal/funk"
 )
 
-type Repo struct {
-	Owner
-	Name string
-}
+type Repository = github.Repository
+type RepoAllowList []*github.Repository
 
-type RepoAllowList []Repo
-
-func (list RepoAllowList) Allows(ghrepo *github.Repository) bool {
-	for _, repo := range list {
-		owner := repo.Owner.Login
-		repoName := repo.Name
-
-		if owner == "" && repoName == "" {
+func (allowList RepoAllowList) Allows(ghRepo *Repository) bool {
+	for _, repo := range allowList {
+		// Effectively: */*
+		if repo.Owner == nil && repo.Name == nil {
 			return true
 		}
-		if owner == "" && repoName != "" {
-			return repoName == *ghrepo.Name
+
+		// Effectively: owner/*
+		if repo.Owner != nil && repo.Name == nil {
+			match := *repo.Owner.Login == *ghRepo.Owner.Login
+			if match == true {
+				return true
+			}
+
+			continue // next!
 		}
-		if owner != "" && repoName == "" {
-			return owner == *ghrepo.Owner.Login
+
+		// Effectively: */repo
+		if repo.Owner == nil && repo.Name != nil {
+			match := *repo.Name == *ghRepo.Name
+			if match == true {
+				return true
+			}
+
+			continue // next!
 		}
-		if owner != "" && repoName != "" {
-			return owner == *ghrepo.Owner.Login && repoName == *ghrepo.Name
+
+		// Effectively: owner/repo
+		if repo.Owner != nil && repo.Name != nil {
+			match := *repo.Owner.Login == *ghRepo.Owner.Login && *repo.Name == *ghRepo.Name
+			if match == true {
+				return true
+			}
+
+			continue // next! (this is the end. for now...)
 		}
 	}
 
-	return false // this should never be triggered
-}
-
-func (r Repo) String() string {
-	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
+	return false // I don't know if this should be true or false, so I just picked one at random.
 }
 
 type listReposConfig struct {
-	owner Owner
-	repos RepoAllowList
+	allowlist RepoAllowList
 }
 
-func ListReposOwnedBy(owner Owner) funk.Option[listReposConfig] {
+func ListReposOwnedBy(user *github.User) funk.Option[listReposConfig] {
 	return func(config *listReposConfig) {
-		config.owner = owner
+		config.allowlist = append(config.allowlist, &Repository{Owner: user})
 	}
 }
 
-func ListReposExclusiveTo(repos []Repo) funk.Option[listReposConfig] {
+func ListReposAllowedBy(allowlist []*Repository) funk.Option[listReposConfig] {
 	return func(config *listReposConfig) {
-		config.repos = repos
+		config.allowlist = allowlist
 	}
 }
 
-func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposConfig]) (<-chan Repo, <-chan error) {
+func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposConfig]) (<-chan *Repository, <-chan error) {
 	var config = funk.ConfigWithOptions[listReposConfig](opts)
-	return channel.Async(func(outchan chan Repo, errchan chan error) {
+	return channel.Async(func(outchan chan *Repository, errchan chan error) {
 		opt := &github.RepositoryListByAuthenticatedUserOptions{
 			ListOptions: github.ListOptions{PerPage: 100},
 		}
@@ -74,12 +84,9 @@ func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposCon
 			}
 
 			for _, repo := range repos {
-				if config.repos.Allows(repo) {
+				if config.allowlist.Allows(repo) {
 					c.log.Debugf("\trepo=%s", *repo.FullName)
-					outchan <- Repo{
-						Owner: Owner{Login: *repo.Owner.Login},
-						Name:  *repo.Name,
-					}
+					outchan <- repo
 				}
 			}
 
@@ -89,17 +96,4 @@ func (c *Client) ListRepos(ctx context.Context, opts ...funk.Option[listReposCon
 			opt.Page = res.NextPage
 		}
 	})
-}
-
-func isOwnerMatch(reference Owner, candidate *github.User) bool {
-	if reference.Login == "" {
-		return true
-	}
-	if candidate == nil {
-		return false
-	}
-	if candidate.Login == nil {
-		return false
-	}
-	return reference.Login == *candidate.Login
 }
