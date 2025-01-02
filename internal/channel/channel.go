@@ -34,9 +34,10 @@ func Filter[T any](ctx context.Context, in <-chan T, out chan<- T, predicate fun
 type MapperFunc[IN, OUT any] func(IN) (OUT, error)
 
 func Map[IN, OUT any](ctx context.Context, in <-chan IN, mapper MapperFunc[IN, OUT]) (<-chan OUT, <-chan error) {
-	out, errs := make(chan OUT), make(chan error)
+	outs, errs := make(chan OUT), make(chan error)
 	go func() {
-		defer close(out)
+		defer close(outs)
+		defer close(errs)
 
 		for val := range in {
 			mval, merr := mapper(val)
@@ -44,11 +45,11 @@ func Map[IN, OUT any](ctx context.Context, in <-chan IN, mapper MapperFunc[IN, O
 				errs <- merr
 				return // assume there is no value (no way to check nil)
 			}
-			out <- mval
+			outs <- mval
 		}
 
 	}()
-	return out, errs
+	return outs, errs
 }
 
 func ForEach[T any](ctx context.Context, src <-chan T, callback func(T)) {
