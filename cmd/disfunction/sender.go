@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/karlhepler/disfunction/pkg/handler"
 )
 
@@ -10,6 +12,6 @@ func NewConsoleSender() ConsoleSender {
 	return ConsoleSender{}
 }
 
-func (console ConsoleSender) Send(data handler.DisfunctionRes) {
-	// fmt.Println(data.Patch)
+func (console ConsoleSender) Send(res handler.DisfunctionRes) {
+	fmt.Println(res.GoFunc.Line)
 }

@@ -2,13 +2,13 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/karlhepler/disfunction/internal/channel"
 	"github.com/karlhepler/disfunction/internal/github"
 	"github.com/karlhepler/disfunction/internal/log"
+	"github.com/karlhepler/disfunction/internal/parse"
 )
 
 // TODO(karlhepler):devex Also have a way to call the most fequently called functions.
@@ -51,8 +51,8 @@ func (req DisfunctionReq) Context() context.Context {
 }
 
 type DisfunctionRes struct {
-	Ctx context.Context
-	// Patch github.Patch
+	Ctx    context.Context
+	GoFunc parse.GoFunc
 }
 
 func (res DisfunctionRes) Context() context.Context {
@@ -74,32 +74,42 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 
 	var ctx = req.Context()
 
-	// List all detailed commits within a time range, filtered by OwerRepos
-	// If OwnerRepos.Repos is nil, then it defaults to true. This allows you to
-	// specify only the Owner and have it apply to all of that owner's repos.
 	commits, errs := hdl.gh.ListCommits(ctx,
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
 		github.ListCommitsExclusiveTo(req.AllowedRepos),
-		github.ListCommitsToFiles(req.AllowedFiles),
 		github.ListCommitsWithDetail(true),
+		github.ListCommitsToFiles(req.AllowedFiles),
 	)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
-	channel.ForEach(ctx, commits, func(commit github.Commit) {
-		fmt.Println("Howdy, ", commit.Author.String())
+
+	gofuncs, errs := channel.Map(ctx, commits, func(commit github.Commit, outs chan<- parse.GoFunc, errs chan<- error) {
+		for _, file := range commit.Files {
+			if file.Patch == nil {
+				continue
+			}
+
+			err := parse.ForEachLineMatch(
+				*file.Patch,
+				parse.MatchAll(parse.MatchGitAdd, parse.MatchGoFunc),
+				func(line string) {
+					outs <- parse.GoFunc{
+						Line:   line,
+						Commit: commit,
+					}
+				},
+			)
+
+			if err != nil {
+				errs <- err
+			}
+		}
 	})
+	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
-	// list all patches from commits
-	// patches, errs := hdl.gh.ListPatchesByCommits(ctx, commits)
-	// channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
-
-	// list all new function declarations for all patches
-	// TODO(karlhepler): I was thinking of renaming this to FilterPatchesBy.
-	// gofuncs, errs := parse.ListAddedGoFuncsByPatches(ctx, patches)
-	// channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
-	// channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {
-	// 	fmt.Println(gofunc.Line)
-	// })
+	channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {
+		res.Send(DisfunctionRes{ctx, gofunc})
+	})
 
 	wg.Wait()
 }

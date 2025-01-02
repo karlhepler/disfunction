@@ -85,19 +85,20 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 			)
 			channel.GoFwd(ctx, &wg, errs, errchan)
 
+			// must get detail if there is a file allow list
+			if len(config.fileAllowList) > 0 {
+				config.withDetail = true
+			}
+
 			if config.withDetail == true {
-				commits, errs = channel.Map(ctx, commits, func(commit Commit) (Commit, error) {
+				commits, errs = channel.Map(ctx, commits, func(commit Commit, outs chan<- Commit, errs chan<- error) {
 					ownerLogin, repoName := *commit.Repository.Owner.Login, *commit.Repository.Name
 					c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", ownerLogin, repoName, *commit.SHA)
 					detail, _, err := c.gh.Repositories.GetCommit(ctx, ownerLogin, repoName, *commit.SHA, nil)
 					if err != nil {
-						return commit, fmt.Errorf("error getting commit; repo=%s sha=%s", *commit.Repository.FullName, *commit.SHA)
+						errs <- fmt.Errorf("error getting commit; repo=%s sha=%s", *commit.Repository.FullName, *commit.SHA)
 					}
-
-					return Commit{
-						Repository:       commit.Repository,
-						RepositoryCommit: detail,
-					}, nil
+					outs <- Commit{Repository: commit.Repository, RepositoryCommit: detail}
 				})
 				channel.GoFwd(ctx, &wg, errs, errchan)
 			}
@@ -119,33 +120,6 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 		wg.Wait() // I'm not confident that I actually need this
 	})
 }
-
-// func (c *Client) ListDetailedCommits(ctx context.Context, opts ...funk.Option[listCommitsConfig]) (<-chan Commit, <-chan error) {
-// 	commits, listCommitsErrs := c.ListCommits(ctx, opts...)
-// 	return channel.Async(func(outchan chan Commit, errchan chan error) {
-// 		var wg sync.WaitGroup
-// 		channel.GoFwd(ctx, &wg, listCommitsErrs, errchan)
-
-// 		channel.ForEach(ctx, commits, func(commit Commit) {
-// 			c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", commit.Repo.Owner, commit.Repo.Name, *commit.SHA)
-// 			detailedCommit, res, err := c.gh.Repositories.GetCommit(ctx, *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA, nil)
-// 			if err != nil {
-// 				errchan <- fmt.Errorf("error getting commit; repo=%s sha=%s", commit.Repo, *commit.SHA)
-// 			}
-
-// 			outchan <- Commit{
-// 				Repo:             commit.Repo,
-// 				RepositoryCommit: detailedCommit,
-// 			}
-
-// 			if res == nil {
-// 				return
-// 			}
-// 		})
-
-// 		wg.Wait()
-// 	})
-// }
 
 type listCommitsByRepoConfig struct {
 	since time.Time

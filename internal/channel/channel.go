@@ -27,32 +27,25 @@ func Filter[T any](ctx context.Context, in <-chan T, predicate func(T) bool) <-c
 	outs := make(chan T)
 	go func() {
 		defer close(outs)
-		for val := range in {
+		ForEach(ctx, in, func(val T) {
 			if predicate(val) {
 				outs <- val
 			}
-		}
+		})
 	}()
 	return outs
 }
 
-type MapperFunc[IN, OUT any] func(IN) (OUT, error)
+type MapperFunc[IN, OUT any] func(IN, chan<- OUT, chan<- error)
 
 func Map[IN, OUT any](ctx context.Context, in <-chan IN, mapper MapperFunc[IN, OUT]) (<-chan OUT, <-chan error) {
 	outs, errs := make(chan OUT), make(chan error)
 	go func() {
 		defer close(outs)
 		defer close(errs)
-
-		for val := range in {
-			mval, merr := mapper(val)
-			if merr != nil {
-				errs <- merr
-				return // assume there is no value (no way to check nil)
-			}
-			outs <- mval
-		}
-
+		ForEach(ctx, in, func(val IN) {
+			mapper(val, outs, errs)
+		})
 	}()
 	return outs, errs
 }
