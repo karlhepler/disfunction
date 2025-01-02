@@ -21,19 +21,17 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name:  "random",
-				Usage: "Display a random function chosen from all affiliated repos within a date range.",
+				Usage: "Display a random function from all repos within a date range.",
 				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name: "owner",
-						Usage: dedent.Dedent(`Filter repos by owner.
-							If not defined, this will default to all repos GITHUB_TOKEN has access to.
-						`),
-					},
 					&cli.StringSliceFlag{
-						Name: "repos",
+						Name: "owner-repos",
 						Usage: dedent.Dedent(`Filter repos by this allow list.
-							This must be used in conjunction with '--owner <value>'.
-							If not defined, this will allow all repos through.
+							If not defined, this will allow all accessible repos through.
+
+							Examples:
+								--owner-repos foo bar						# allow all repos owned by foo and bar
+								--owner-repos /fizz /buzz 			# allow all repos named fizz and buzz from all owners
+								--owner-repos foo/fizz bar/buzz # only allow foo/fizz and bar/buzz owner/repos
 						`),
 					},
 					&cli.TimestampFlag{
@@ -86,18 +84,18 @@ func main() {
 
 					ownerRepos := cmd.StringSlice("owner-repos")
 					repos := make([]*github.Repository, len(ownerRepos))
-					for _, ownerRepo := range ownerRepos {
-						repo := &github.Repository{}
+					for i, ownerRepo := range ownerRepos {
+						repos[i] = &github.Repository{}
 
 						parts := strings.Split(ownerRepo, "/")
 						if ownerLogin := parts[0]; ownerLogin != "" {
-							repo.Owner = &github.User{
+							repos[i].Owner = &github.User{
 								Login: &ownerLogin,
 							}
 						}
 						if len(parts) > 1 {
 							if repoName := parts[1]; repoName != "" {
-								repo.Name = &repoName
+								repos[i].Name = &repoName
 							}
 						}
 					}
