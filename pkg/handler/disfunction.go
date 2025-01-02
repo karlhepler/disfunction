@@ -75,31 +75,24 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
 		github.ListCommitsExclusiveTo(req.AllowedRepos),
-		github.ListCommitsWithDetail(true),
 		github.ListCommitsToFiles(req.AllowedFiles),
 	)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	gofuncs, errs := channel.Map(ctx, commits, func(commit github.Commit, outs chan<- parse.GoFunc, errs chan<- error) {
 		for _, file := range commit.Files {
-			if file.Patch == nil {
-				continue
-			}
-
-			err := parse.ForEachLineMatch(
-				*file.Patch,
+			hdl.log.Debugf("\tfile=%s", file.GetFilename())
+			parse.ForEachLineMatch(
+				file.GetPatch(),
 				parse.MatchAll(parse.MatchGitAdd, parse.MatchGoFunc),
 				func(line string) {
+					hdl.log.Debugf("\tline=%s", line)
 					outs <- parse.GoFunc{
 						Line:   line,
 						Commit: commit,
 					}
 				},
 			)
-
-			if err != nil {
-				errs <- err
-			}
 		}
 	})
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
