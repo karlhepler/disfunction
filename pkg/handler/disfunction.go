@@ -39,10 +39,11 @@ func NewDisfunction(ghtoken string, log log.Logger) (*Disfunction, error) {
 }
 
 type DisfunctionReq struct {
-	Ctx   context.Context
-	Since time.Time
-	Until time.Time
-	Repos []*github.Repository
+	Ctx          context.Context
+	Since        time.Time
+	Until        time.Time
+	AllowedRepos github.RepoAllowList
+	AllowedFiles github.FileAllowList
 }
 
 func (req DisfunctionReq) Context() context.Context {
@@ -79,7 +80,8 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	commits, errs := hdl.gh.ListCommits(ctx,
 		github.ListCommitsSince(req.Since),
 		github.ListCommitsUntil(req.Until),
-		github.ListCommitsExclusiveTo(req.Repos),
+		github.ListCommitsExclusiveTo(req.AllowedRepos),
+		github.ListCommitsToFiles(req.AllowedFiles),
 		github.ListCommitsWithDetail(true),
 	)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)

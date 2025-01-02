@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
-	"github.com/karlhepler/disfunction/internal/github"
 	"github.com/karlhepler/disfunction/internal/time"
 	"github.com/karlhepler/disfunction/pkg/handler"
 	"github.com/lithammer/dedent"
@@ -24,14 +22,36 @@ func main() {
 				Usage: "Display a random function from all repos within a date range.",
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
-						Name: "owner-repos",
+						Name: "repos",
+						Aliases: []string{
+							"r",
+							"repo",
+							"owner/repo",
+							"owner/repos",
+						},
 						Usage: dedent.Dedent(`Filter repos by this allow list.
 							If not defined, this will allow all accessible repos through.
 
 							Examples:
-								--owner-repos foo bar						# allow all repos owned by foo and bar
-								--owner-repos /fizz /buzz 			# allow all repos named fizz and buzz from all owners
-								--owner-repos foo/fizz bar/buzz # only allow foo/fizz and bar/buzz owner/repos
+								--repos foo/,bar/						# allow all repos owned by foo and bar
+								--repos fizz,buzz 					# allow all repos named fizz and buzz from all owners
+								--repos foo/fizz,bar/buzz 	# only allow owner/repos foo/fizz and bar/buzz
+						`),
+					},
+					&cli.StringSliceFlag{
+						Name: "files",
+						Aliases: []string{
+							"f",
+							"file",
+							"pattern",
+							"patterns",
+						},
+						Usage: dedent.Dedent(`Filter commits by file pattern.
+							If not defined, this will allow all commits.
+
+							Examples:
+								--files foo.go,bar.js
+								--files '*.go,*.js'
 						`),
 					},
 					&cli.TimestampFlag{
@@ -82,29 +102,12 @@ func main() {
 						return fmt.Errorf("disfunction init failed: %w", err)
 					}
 
-					ownerRepos := cmd.StringSlice("owner-repos")
-					repos := make([]*github.Repository, len(ownerRepos))
-					for i, ownerRepo := range ownerRepos {
-						repos[i] = &github.Repository{}
-
-						parts := strings.Split(ownerRepo, "/")
-						if ownerLogin := parts[0]; ownerLogin != "" {
-							repos[i].Owner = &github.User{
-								Login: &ownerLogin,
-							}
-						}
-						if len(parts) > 1 {
-							if repoName := parts[1]; repoName != "" {
-								repos[i].Name = &repoName
-							}
-						}
-					}
-
 					req := handler.DisfunctionReq{
-						Ctx:   ctx,
-						Repos: repos,
-						Since: cmd.Timestamp("since"),
-						Until: cmd.Timestamp("until"),
+						Ctx:          ctx,
+						AllowedRepos: parseRepos(cmd.StringSlice("repos")),
+						AllowedFiles: cmd.StringSlice("files"),
+						Since:        cmd.Timestamp("since"),
+						Until:        cmd.Timestamp("until"),
 					}
 
 					sender := NewConsoleSender()

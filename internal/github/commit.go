@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -21,6 +22,22 @@ type listCommitsConfig struct {
 	until         time.Time
 	repoAllowList RepoAllowList
 	withDetail    bool
+	fileAllowList FileAllowList
+}
+
+type FileAllowList []string
+
+func (allowlist FileAllowList) Allows(file *github.CommitFile) bool {
+	for _, pattern := range allowlist {
+		match, err := filepath.Match(pattern, *file.Filename)
+		if err != nil {
+			continue
+		}
+		if match == true {
+			return true
+		}
+	}
+	return false
 }
 
 func ListCommitsExclusiveTo(repos []*github.Repository) funk.Option[listCommitsConfig] {
@@ -38,6 +55,12 @@ func ListCommitsSince(since time.Time) funk.Option[listCommitsConfig] {
 func ListCommitsUntil(until time.Time) funk.Option[listCommitsConfig] {
 	return func(config *listCommitsConfig) {
 		config.until = until
+	}
+}
+
+func ListCommitsToFiles(patterns []string) funk.Option[listCommitsConfig] {
+	return func(config *listCommitsConfig) {
+		config.fileAllowList = patterns
 	}
 }
 
@@ -64,10 +87,11 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 
 			if config.withDetail == true {
 				commits, errs = channel.Map(ctx, commits, func(commit Commit) (Commit, error) {
-					c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA)
-					detail, _, err := c.gh.Repositories.GetCommit(ctx, *commit.Repository.Owner.Login, *commit.Repository.Name, *commit.SHA, nil)
+					ownerLogin, repoName := *commit.Repository.Owner.Login, *commit.Repository.Name
+					c.log.Debugf("*github.Client.Repositories.GetCommit(owner=%s, repo=%s, sha=%s)", ownerLogin, repoName, *commit.SHA)
+					detail, _, err := c.gh.Repositories.GetCommit(ctx, ownerLogin, repoName, *commit.SHA, nil)
 					if err != nil {
-						return commit, fmt.Errorf("error getting commit; repo=%s sha=%s", *commit.Repository, *commit.SHA)
+						return commit, fmt.Errorf("error getting commit; repo=%s sha=%s", *commit.Repository.FullName, *commit.SHA)
 					}
 
 					return Commit{
@@ -78,10 +102,21 @@ func (c *Client) ListCommits(ctx context.Context, opts ...funk.Option[listCommit
 				channel.GoFwd(ctx, &wg, errs, errchan)
 			}
 
+			if len(config.fileAllowList) > 0 {
+				commits = channel.Filter(ctx, commits, func(commit Commit) bool {
+					for _, file := range commit.Files {
+						if config.fileAllowList.Allows(file) {
+							return true
+						}
+					}
+					return false
+				})
+			}
+
 			channel.Fwd(ctx, commits, outchan)
 		})
 
-		wg.Wait()
+		wg.Wait() // I'm not confident that I actually need this
 	})
 }
 
@@ -139,6 +174,8 @@ func (c *Client) ListCommitsByRepo(ctx context.Context, repo *github.Repository,
 				^ I can't use this here, but thought I'd write a note about it.
 				This tells GitHub to only return commits that include this path.
 			  In this example, only commits that affected `go.mod` will be returned.
+				From what I can tell, this can only be a single path and it must be
+				relative to git root. It can't be a glob or a list of paths.
 			*/
 			ListOptions: github.ListOptions{PerPage: 100},
 		}
