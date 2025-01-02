@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/karlhepler/disfunction/pkg/handler"
+	"github.com/lithammer/dedent"
 )
 
 type ConsoleSender struct{}
@@ -13,5 +14,15 @@ func NewConsoleSender() ConsoleSender {
 }
 
 func (console ConsoleSender) Send(res handler.DisfunctionRes) {
-	fmt.Println(res.GoFunc.Line)
+	gofunc := res.GoFunc
+
+	fmt.Printf(dedent.Dedent(`
+			Commit Author: %s
+			Commit URL: %s
+			Function: %s
+		`),
+		gofunc.RepositoryCommit.GetCommit().GetAuthor().GetName(),
+		gofunc.RepositoryCommit.GetHTMLURL(),
+		gofunc.Line,
+	)
 }

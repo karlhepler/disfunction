@@ -64,6 +64,14 @@ func ForEach[T any](ctx context.Context, src <-chan T, callback func(T)) {
 	}
 }
 
+func Collect[T any](ctx context.Context, src <-chan T) []T {
+	var out []T
+	ForEach(ctx, src, func(val T) {
+		out = append(out, val)
+	})
+	return out
+}
+
 func GoFwd[T any](ctx context.Context, wg *sync.WaitGroup, src <-chan T, dest chan<- T) {
 	wg.Add(1)
 	go func() {

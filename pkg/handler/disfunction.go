@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -103,9 +104,10 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	})
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
-	channel.ForEach(ctx, gofuncs, func(gofunc parse.GoFunc) {
-		res.Send(DisfunctionRes{ctx, gofunc})
-	})
+	allGoFuncs := channel.Collect(ctx, gofuncs)
+	randIdx := rand.Intn(len(allGoFuncs))
+	gofunc := allGoFuncs[randIdx]
+	res.Send(DisfunctionRes{ctx, gofunc})
 
 	wg.Wait()
 }
