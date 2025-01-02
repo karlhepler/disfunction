@@ -59,10 +59,6 @@ func (res DisfunctionRes) Context() context.Context {
 	return res.Ctx
 }
 
-func (r DisfunctionRes) Send(res DisfunctionRes) {
-	//
-}
-
 // Disfunction.Handle is a usecase.Handler
 //
 // TODO(karlhepler):devex automatically run something to generate these comments

@@ -3,10 +3,10 @@ package github
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/channel"
 	"github.com/karlhepler/disfunction/internal/funk"
@@ -29,7 +29,7 @@ type FileAllowList []string
 
 func (allowlist FileAllowList) Allows(file *github.CommitFile) bool {
 	for _, pattern := range allowlist {
-		match, err := filepath.Match(pattern, *file.Filename)
+		match, err := doublestar.PathMatch(pattern, *file.Filename)
 		if err != nil {
 			continue
 		}

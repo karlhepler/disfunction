@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/bmatcuk/doublestar v1.3.4 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
 )
