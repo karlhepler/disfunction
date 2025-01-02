@@ -79,7 +79,7 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 	)
 	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
-	gofuncs, errs := channel.Map(ctx, commits, func(commit github.Commit, outs chan<- parse.GoFunc, errs chan<- error) {
+	gofuncs, _ := channel.Map(ctx, commits, func(commit github.Commit, outs chan<- parse.GoFunc, _ chan<- error) {
 		for _, file := range commit.Files {
 			hdl.log.Debugf("\tfile=%s", file.GetFilename())
 			parse.ForEachLineMatch(
@@ -95,11 +95,11 @@ func (hdl *Disfunction) Handle(req DisfunctionReq, res Sender[DisfunctionRes]) {
 			)
 		}
 	})
-	channel.GoForEach(ctx, &wg, errs, hdl.log.Error)
 
 	allGoFuncs := channel.Collect(ctx, gofuncs)
-	randIdx := rand.Intn(len(allGoFuncs))
-	gofunc := allGoFuncs[randIdx]
+
+	randi := rand.Intn(len(allGoFuncs))
+	gofunc := allGoFuncs[randi]
 	res.Send(DisfunctionRes{ctx, gofunc})
 
 	wg.Wait()
