@@ -1,8 +1,8 @@
-package handler
+package api
 
 import "context"
 
-type Interface[RequestData, ResponseData WithContext] interface {
+type Handler[RequestData, ResponseData WithContext] interface {
 	Handle(req RequestData, res Sender[ResponseData])
 }
 
@@ -19,6 +19,6 @@ type WithContext interface {
 // this is enough for now.
 //
 // Since this gets run with every request, this is a great place to tap into.
-func Handle[RequestData, ResponseData WithContext](hdl Interface[RequestData, ResponseData], req RequestData, res Sender[ResponseData]) {
+func Handle[RequestData, ResponseData WithContext](hdl Handler[RequestData, ResponseData], req RequestData, res Sender[ResponseData]) {
 	hdl.Handle(req, res)
 }

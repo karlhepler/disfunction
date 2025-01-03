@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/karlhepler/disfunction/pkg/handler"
+	"github.com/karlhepler/disfunction/pkg/api"
 	"github.com/lithammer/dedent"
 )
 
@@ -13,7 +13,7 @@ func NewConsoleSender() ConsoleSender {
 	return ConsoleSender{}
 }
 
-func (console ConsoleSender) Send(res handler.DisfunctionRes) {
+func (console ConsoleSender) Send(res api.DisfunctionRes) {
 	gofunc := res.GoFunc
 
 	fmt.Printf(dedent.Dedent(`

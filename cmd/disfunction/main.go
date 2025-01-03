@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/karlhepler/disfunction/internal/time"
-	"github.com/karlhepler/disfunction/pkg/handler"
+	"github.com/karlhepler/disfunction/pkg/api"
 	"github.com/lithammer/dedent"
 	"github.com/urfave/cli/v3"
 )
@@ -97,12 +97,12 @@ func main() {
 
 					enableDebugMode := cmd.Bool("debug")
 					console := NewConsoleLogger(enableDebugMode)
-					hdl, err := handler.NewDisfunction(token, console)
+					hdl, err := api.NewDisfunction(token, console)
 					if err != nil {
 						return fmt.Errorf("disfunction init failed: %w", err)
 					}
 
-					req := handler.DisfunctionReq{
+					req := api.DisfunctionReq{
 						Ctx:          ctx,
 						AllowedRepos: parseRepos(cmd.StringSlice("repos")),
 						AllowedFiles: cmd.StringSlice("files"),
@@ -111,7 +111,7 @@ func main() {
 					}
 
 					sender := NewConsoleSender()
-					handler.Handle(hdl, req, sender) // enforce types before invoking the handler
+					api.Handle(hdl, req, sender) // enforce types before invoking the handler
 					return nil
 				},
 			},
