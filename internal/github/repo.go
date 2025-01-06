@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-github/v67/github"
 	"github.com/karlhepler/disfunction/internal/channel"
@@ -10,6 +11,30 @@ import (
 )
 
 type Repository = github.Repository
+
+func NewRepository(ownerRepo string) *Repository {
+	repo := new(Repository)
+
+	// default to repo name
+	if !strings.Contains(ownerRepo, "/") {
+		ownerRepo = "/" + ownerRepo
+	}
+
+	parts := strings.Split(ownerRepo, "/")
+	if ownerLogin := parts[0]; ownerLogin != "" {
+		repo.Owner = &github.User{
+			Login: &ownerLogin,
+		}
+	}
+	if len(parts) > 1 {
+		if repoName := parts[1]; repoName != "" {
+			repo.Name = &repoName
+		}
+	}
+
+	return repo
+}
+
 type RepoAllowList []*github.Repository
 
 func (allowList RepoAllowList) Allows(ghRepo *Repository) bool {
